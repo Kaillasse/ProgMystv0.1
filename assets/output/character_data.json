@@ -1,0 +1,50 @@
+{
+  "base": {
+    "index": 0,
+    "color": null
+  },
+  "hair": {
+    "index": 1,
+    "color": "#659638"
+  },
+  "head": {
+    "index": 0,
+    "color": null
+  },
+  "eyebrows": {
+    "index": 6,
+    "color": "#659638"
+  },
+  "eyes": {
+    "index": 0,
+    "color": null
+  },
+  "ears": {
+    "index": 0,
+    "color": null
+  },
+  "rear_hair": {
+    "index": 6,
+    "color": "#659638"
+  },
+  "front_hair": {
+    "index": 3,
+    "color": "#659638"
+  },
+  "clothes": {
+    "index": 4,
+    "color": null
+  },
+  "accessory": {
+    "index": 5,
+    "color": null
+  },
+  "nose": {
+    "index": 0,
+    "color": null
+  },
+  "mouth": {
+    "index": 0,
+    "color": null
+  }
+}
