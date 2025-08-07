@@ -1,0 +1,23 @@
+# Dossiers temporaires Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# VSCode
+.vscode/
+
+# Fichiers d'export/images
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Données locales non nécessaires dans le dépôt
+data/*.json
+data/*.png
+
+# Autres
+*.log
+*.db
+.env

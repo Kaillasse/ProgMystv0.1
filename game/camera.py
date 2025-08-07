@@ -12,14 +12,13 @@ class Camera:
         self.center_on_character(target)
 
     def center_on_character(self, character):
-        """Centre la caméra sur le personnage (mode exploration)."""
-        new_x = character.pixel_pos[0] - self.width // 2
-        new_y = character.pixel_pos[1] - self.height // 2
-        
+        """Centre la caméra sur le personnage (mode exploration) en utilisant la position de rendu logique."""
+        pixel_x, pixel_y = character.get_render_position()
+        new_x = pixel_x - self.width // 2
+        new_y = pixel_y - self.height // 2
         # Affiche seulement si la position change significativement
         if abs(new_x - self._last_pos[0]) > 1 or abs(new_y - self._last_pos[1]) > 1:
             self._last_pos = (new_x, new_y)
-        
         self.x = new_x
         self.y = new_y
 
@@ -30,4 +29,3 @@ class Camera:
     def get_offset(self):
         """Retourne l'offset actuel de la caméra"""
         return (self.x, self.y)
-        return pos[0] - self.x, pos[1] - self.y

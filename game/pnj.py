@@ -13,63 +13,46 @@ class NPC:
         self.name = name
         self.sprite_path = sprite_path
         self.bust_path = bust_path
-        self.start_map = start_map or map_name  # map_name = nom de la map d'apparition
-        self.map_name = self.start_map  # Alias pour clarté
+        self.map_name = start_map or map_name
         self.start_tile = start_tile or (0, 0)
-        self.tile_pos = list(self.start_tile)  # Position tuile dans la map
+        self.tile_pos = list(self.start_tile)
         self.dialogues = dialogues or []
         self.dialogue_index = 0
         self.quest_progress_key = quest_progress_key or f"{self.name.lower()}_progress"
         self.dialog_state = 0
         self.has_given_quests = False
-
-        # Chargement sprite et bust (optionnel) avec gestion d'erreurs
-        if self.sprite_path:
-            try:
-                self.sprite = pygame.image.load(self.sprite_path).convert_alpha()
-            except (pygame.error, FileNotFoundError):
-                print(f"[NPC] ATTENTION: Impossible de charger le sprite {self.sprite_path}")
-                self.sprite = None
-        else:
-            self.sprite = None
-
-        if self.bust_path:
-            try:
-                self.bust = pygame.image.load(self.bust_path).convert_alpha()
-            except (pygame.error, FileNotFoundError):
-                print(f"[NPC] ATTENTION: Impossible de charger le bust {self.bust_path}")
-                self.bust = None
-        else:
-            self.bust = None
-
+        self.sprite = self._load_image(self.sprite_path)
+        self.bust = self._load_image(self.bust_path)
         self.animations = animations or {}
 
+    def _load_image(self, path):
+        if path:
+            try:
+                return pygame.image.load(path).convert_alpha()
+            except (pygame.error, FileNotFoundError):
+                print(f"[NPC] ATTENTION: Impossible de charger l'image {path}")
+        return None
+
     def load_progress_from_session(self, session):
-        """Charge la progression depuis la session du joueur"""
         if session:
             self.has_given_quests = session.get_progress(f"npc_{self.name.lower()}_quests_given", False)
             if self.has_given_quests:
-                self.dialog_state = 0  # Reset à 0 si déjà donné
+                self.dialog_state = 0
             print(f"[DEBUG] Progression chargée pour {self.name}: quêtes données = {self.has_given_quests}")
 
     def load_progress(self, session):
-        """Charge la progression des dialogues depuis la session"""
-        if not session:
-            return
-        progress = session.data.get(self.quest_progress_key, {})
-        self.dialog_state = progress.get("dialog_state", 0)
-        self.has_given_quests = progress.get("has_given_quests", False)
+        if session:
+            progress = session.data.get(self.quest_progress_key, {})
+            self.dialog_state = progress.get("dialog_state", 0)
+            self.has_given_quests = progress.get("has_given_quests", False)
 
     def save_progress(self, session):
-        """Sauvegarde la progression des dialogues dans la session"""
-        if not session:
-            return
-        progress = {
-            "dialog_state": self.dialog_state,
-            "has_given_quests": self.has_given_quests
-        }
-        session.data[self.quest_progress_key] = progress
-        session.save_data()
+        if session:
+            session.data[self.quest_progress_key] = {
+                "dialog_state": self.dialog_state,
+                "has_given_quests": self.has_given_quests
+            }
+            session.save_data()
 
     def speak(self):
         if self.dialogues:
@@ -79,9 +62,7 @@ class NPC:
             print(f"{self.name} reste silencieux...")
 
     def distance_to_player(self, player):
-        dx = self.tile_pos[0] - player.tile_pos[0]
-        dy = self.tile_pos[1] - player.tile_pos[1]
-        return abs(dx) + abs(dy)  # Ou utilise une autre métrique
+        return abs(self.tile_pos[0] - player.tile_pos[0]) + abs(self.tile_pos[1] - player.tile_pos[1])
 
 #DameIndenta
 class DameIndenta(NPC):

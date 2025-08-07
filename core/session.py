@@ -83,9 +83,8 @@ class GameSession:
         self.name = player_name
         # Correction : charge la map via Zone
         zone = Zone("clairiere")
-        zone._load_map()
+        zone._load_map_and_build_grid()
         self.map = zone.grid_layers
-        self.z_offsets = zone.z_offsets
         if self.map and len(self.map) > 0:
             self.grid = self.map[0]  # Layer sol
         else:
