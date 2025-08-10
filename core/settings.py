@@ -32,7 +32,7 @@ FONT_DIR = os.path.join(ASSETS_DIR, "fonts")
 # Fonts
 FONTS = {
     "title": os.path.join(FONT_DIR, "DungeonFont.ttf"),
-    # Tu pourras ajouter d'autres fonts ici plus tard
+    'button': os.path.join(FONT_DIR, "dungeon-mode.ttf")
 }
 
 # === FICHIERS FONDAMENTAUX ===

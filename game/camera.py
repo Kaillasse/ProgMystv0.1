@@ -22,6 +22,13 @@ class Camera:
         self.x = new_x
         self.y = new_y
 
+    def center_on_combat_arena(self, world):
+        """Centre la caméra sur le centre de la map pour le mode combat."""
+        map_width = world.width * world.tile_size
+        map_height = world.height * world.tile_size
+        self.x = (map_width - self.width) // 2
+        self.y = (map_height - self.height) // 2
+
     def apply(self, pos):
         """Applique l'offset de la caméra à une position"""
         return pos[0] - self.x, pos[1] - self.y

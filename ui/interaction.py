@@ -2,6 +2,12 @@ import os
 import pygame
 from ui.uitools import BorderManager
 
+# Import des arbres de dialogue
+from game.pnj.dame_indenta import dame_indenta_dialogue_tree
+from game.pnj.neuill import neuill_dialogue_tree
+from game.pnj.json import json_dialogue_tree
+from game.pnj.loopfang import loopfang_dialogue_tree
+
 class DialogueButton:
     """Classe pour les boutons de réponse dans les dialogues"""
     
@@ -69,16 +75,18 @@ class InteractionUI:
         # Current NPC and character references
         self.current_npc = None
         self.current_character = None
+        
+        # Système d'arbre de dialogue
+        self.dialogue_tree = None
+        self.current_node = "start"
+        
+        # Callback pour déclencher des actions spéciales (comme le combat)
+        self.action_callback = None
 
         
     def start_interaction(self, character, npc, session=None):
         """
-        Démarre une interaction avec un PNJ
-        
-        Args:
-            character: Instance du personnage joueur
-            npc: Instance du PNJ
-            session: Session du joueur (optionnelle)
+        Démarre une interaction avec un PNJ (nouvelle logique arbre de dialogue)
         """
         self.current_character = character
         self.current_npc = npc
@@ -87,13 +95,82 @@ class InteractionUI:
         # Charger les bustes
         self._load_character_busts(character, npc)
         
-        # Obtenir le dialogue du PNJ
-        self._get_npc_dialogue(npc, session)
+        # Construire l'arbre de dialogue pour ce PNJ
+        self.dialogue_tree = self._build_dialogue_tree(npc, session)
+        self.current_node = "start"
         
-        # Créer les boutons de réponse
-        self._create_response_buttons()
+        # Afficher le dialogue initial
+        self._set_dialogue_from_node()
         
         print(f"[INTERACTION] Dialogue démarré avec {npc.name}")
+
+    def _build_dialogue_tree(self, npc, session):
+        """Construit l'arbre de dialogue pour le PNJ donné"""
+        if npc.name == "Dame Indenta":
+            return dame_indenta_dialogue_tree
+        elif npc.name == "Neuill":
+            return neuill_dialogue_tree
+        elif npc.name == "JSON":
+            return json_dialogue_tree
+        elif npc.name == "Loopfang":
+            return loopfang_dialogue_tree
+        else:
+            # Arbre de dialogue générique pour PNJ inconnus
+            return {
+                "start": {
+                    "text": f"{npc.name} vous salue. Que voulez-vous faire ?",
+                    "responses": [
+                        {"label": "Discuter", "next": "talk"},
+                        {"label": "Demander un conseil", "next": "advice"},
+                        {"label": "Au revoir", "action": "end"}
+                    ]
+                },
+                "talk": {
+                    "text": f"{npc.name} : Il fait beau aujourd'hui !",
+                    "responses": [
+                        {"label": "Retour", "next": "start"},
+                        {"label": "Merci", "action": "end"},
+                        {"label": "Au revoir", "action": "end"}
+                    ]
+                },
+                "advice": {
+                    "text": "Continue à explorer et à apprendre !",
+                    "responses": [
+                        {"label": "Retour", "next": "start"},
+                        {"label": "Merci", "action": "end"},
+                        {"label": "Au revoir", "action": "end"}
+                    ]
+                }
+            }
+
+    def _set_dialogue_from_node(self):
+        """Met à jour le texte et les boutons selon le nœud courant de l'arbre de dialogue"""
+        if not self.dialogue_tree or self.current_node not in self.dialogue_tree:
+            self.current_dialogue = "..."
+            self.response_buttons = []
+            return
+            
+        node = self.dialogue_tree[self.current_node]
+        self.current_dialogue = node["text"]
+        
+        # Créer les boutons de réponse
+        self.response_buttons = []
+        dialogue_rect = pygame.Rect(40, self.screen_height - 250, self.screen_width - 80, 200)
+        button_width = 200
+        button_height = 30
+        button_spacing = 20
+        
+        responses = node["responses"]
+        num_buttons = len(responses)
+        total_width = num_buttons * button_width + (num_buttons - 1) * button_spacing
+        start_x = dialogue_rect.left + (dialogue_rect.width - total_width) // 2
+        button_y = self.screen_height - 53
+        
+        for i, resp in enumerate(responses):
+            button_x = start_x + i * (button_width + button_spacing)
+            button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+            button = DialogueButton(resp["label"], resp, button_rect)
+            self.response_buttons.append(button)
         
     def _load_character_busts(self, character, npc):
         """Charge les images de bustes des personnages, retourne une surface de secours si besoin"""
@@ -109,136 +186,6 @@ class InteractionUI:
         self.character_bust = load_bust("data/thib_bust.png", (255, 100, 100))
         bust_path = getattr(npc, 'bust_path', None)
         self.npc_bust = load_bust(bust_path, (100, 100, 255))
-        
-    def _get_npc_dialogue(self, npc, session):
-        """Récupère le dialogue du PNJ"""
-        if hasattr(npc, 'interact') and session:
-            if npc.name == "Dame Indenta":
-                self._get_dame_indenta_dialogue(npc, session)
-            elif npc.name == "Neuill":
-                self._get_neuill_dialogue(npc, session)
-            elif npc.name == "JSON":
-                self._get_json_dialogue(npc, session)
-            elif npc.name == "Loopfang":
-                self._get_loopfang_dialogue(npc, session)
-            else:
-                self.current_dialogue = f"{npc.name} vous salue."
-        elif hasattr(npc, 'dialogues') and npc.dialogues:
-            self.current_dialogue = npc.dialogues[0]
-        else:
-            self.current_dialogue = f"{npc.name} vous salue." if hasattr(npc, 'name') else "Ce PNJ reste silencieux..."
-                
-    def _get_dame_indenta_dialogue(self, dame_indenta, session):
-        """Gère le dialogue spécifique de Dame Indenta"""
-        # Charger la progression
-        dame_indenta.load_progress_from_session(session)
-        
-        if not dame_indenta.has_given_quests:
-            # Première interaction - donner les quêtes
-            messages = [
-                "Bienvenue, jeune apprenti programmeur !",
-                "Je suis Dame Indenta, la gardienne des quêtes de programmation.",
-                "Je vais te confier tes premières quêtes pour apprendre Python.",
-                "Ouvre ton grimoire (fichier Python) et montre-moi tes compétences !",
-                "Voici tes 5 premières quêtes :\n" + \
-                "1. Utilise au moins 2 variables (entier, réel ou chaîne)\n" + \
-                "2. Affecte une valeur à une variable avec =\n" + \
-                "3. Utilise print() pour afficher un message\n" + \
-                "4. Utilise input() pour lire une entrée utilisateur\n" + \
-                "5. Utilise une instruction if pour une condition"
-            ]
-            self.current_dialogue = messages[dame_indenta.dialog_state]
-        else:
-            # Vérifier les quêtes complétées
-            completed = dame_indenta.check_quests(session.name)
-            
-            if completed is None:
-                self.current_dialogue = "Je ne trouve pas ton grimoire dans le dossier des étudiants..."
-            else:
-                quest_codes = ['#Q1', '#Q2', '#Q3', '#Q4', '#Q5']
-                completed_now = [q for q in quest_codes if q in completed]
-                
-                if completed_now:
-                    completion_count = len(completed_now)
-                    self.current_dialogue = f"Excellent ! Tu as accompli {completion_count} de mes quêtes. Continue ainsi !"
-                else:
-                    self.current_dialogue = "Continue à travailler sur ton grimoire. Je sens que tu es sur la bonne voie !"
-                    
-    def _get_neuill_dialogue(self, neuill, session):
-        """Gère le dialogue spécifique de Neuill"""
-        neuill.load_progress_from_session(session)
-        
-        messages = [
-            "Bienvenue dans ma clairière, jeune codeur !",
-            "Je vois que tu explores le monde de Progmyst.",
-            "As-tu déjà rencontré Dame Indenta ? Elle donne d'excellentes quêtes !",
-            "Continue à explorer, chaque zone a ses secrets.",
-            "Reviens me voir quand tu auras progressé !"
-        ]
-        
-        if not hasattr(neuill, 'dialog_state'):
-            neuill.dialog_state = 0
-            
-        self.current_dialogue = messages[neuill.dialog_state % len(messages)]
-        
-    def _get_json_dialogue(self, json_npc, session):
-        """Gère le dialogue spécifique de JSON"""
-        json_npc.load_progress_from_session(session)
-        
-        messages = [
-            "{ \"greeting\": \"Salut, codeur !\" }",
-            "Je vois que tu explores le monde des données.",
-            "Bientôt tu apprendras les dictionnaires et les listes !",
-            "Mes clés et valeurs t'aideront à organiser tes informations.",
-            "{ \"motivation\": \"Continue à coder !\" }"
-        ]
-        
-        if not hasattr(json_npc, 'dialog_state'):
-            json_npc.dialog_state = 0
-            
-        self.current_dialogue = messages[json_npc.dialog_state % len(messages)]
-        
-    def _get_loopfang_dialogue(self, loopfang, session):
-        """Gère le dialogue spécifique de Loopfang"""
-        loopfang.load_progress_from_session(session)
-        
-        messages = [
-            "while apprentissage == True:",
-            "    print('Bienvenue dans ma boucle récursive !')",
-            "Les boucles for et while sont tes amies !",
-            "Répéter du code, c'est mon domaine d'expertise.",
-            "for conseil in mes_conseils: print(conseil)"
-        ]
-        
-        if not hasattr(loopfang, 'dialog_state'):
-            loopfang.dialog_state = 0
-            
-        self.current_dialogue = messages[loopfang.dialog_state % len(messages)]
-                    
-    def _create_response_buttons(self):
-        """Crée les boutons de réponse centrés dans la boîte de dialogue"""
-        self.response_buttons = []
-
-        # Dimensions de la boîte de dialogue
-        dialogue_rect = pygame.Rect(40, self.screen_height - 250, self.screen_width - 80, 200)
-        button_width = 200
-        button_height = 30
-        button_spacing = 20
-        responses = [
-            ("Continuer", "next"),
-            ("En savoir plus", "more"),
-            ("Terminer", "end")
-        ]
-        num_buttons = len(responses)
-        total_width = num_buttons * button_width + (num_buttons - 1) * button_spacing
-        start_x = dialogue_rect.left + (dialogue_rect.width - total_width) // 2
-        button_y = self.screen_height - 53
-
-        for i, (text, action) in enumerate(responses):
-            button_x = start_x + i * (button_width + button_spacing)
-            button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
-            button = DialogueButton(text, action, button_rect)
-            self.response_buttons.append(button)
             
     def update(self, mouse_pos):
         """Met à jour l'interface"""
@@ -266,7 +213,7 @@ class InteractionUI:
             for button in self.response_buttons:
                 if button.is_clicked(event.pos):
                     return self._handle_button_action(button.action)
-                    
+
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 return "end"
@@ -277,20 +224,30 @@ class InteractionUI:
                 
         return None
         
-    def _handle_button_action(self, action):
-        """Gère l'action d'un bouton"""
-        if action == "next":
-            # Avancer dans le dialogue si applicable
-            if hasattr(self.current_npc, 'dialog_state'):
-                self.current_npc.dialog_state += 1
+    def _handle_button_action(self, resp):
+        """Gère l'action d'un bouton de réponse (arbre de dialogue)"""
+        if "action" in resp:
+            if resp["action"] == "end":
+                self.end_interaction()
+                return "end"
+            elif resp["action"] == "start_combat":
+                print("[INTERACTION] Déclenchement du combat générique!")
+                if self.action_callback:
+                    self.action_callback("start_combat")
+                self.end_interaction()
+                return "start_combat"
+            elif resp["action"] == "start_combat_with_dame_indenta":
+                print("[INTERACTION] Déclenchement du combat contre Dame Indenta!")
+                if self.action_callback:
+                    self.action_callback("start_combat_dame_indenta")
+                self.end_interaction()
+                return "start_combat"
+            # Ajouter d'autres actions ici si besoin
+        elif "next" in resp:
+            # Naviguer vers un autre nœud de l'arbre
+            self.current_node = resp["next"]
+            self._set_dialogue_from_node()
             return "continue"
-        elif action == "more":
-            # Demander plus d'informations
-            return "more"
-        elif action == "end":
-            # Terminer le dialogue
-            self.end_interaction()
-            return "end"
         return None
         
     def render(self, screen):

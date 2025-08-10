@@ -1,8 +1,64 @@
 # === core/session.py ===
 import json
 import os
-from game.zone import Zone
-from core.settings import grid_to_iso, iso_to_grid, get_player_data_path, get_player_sprite_path
+from game.world import World
+from core.settings import grid_to_iso, iso_to_grid, get_player_data_path, get_player_sprite_path, get_grimoire_path
+
+
+class SessionManager:
+    """
+    Gestionnaire singleton pour éviter les multiples instances de GameSession
+    """
+    _instance = None
+    _session = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    @classmethod
+    def get_session(cls, name=None):
+        """
+        Récupère ou crée une session unique
+        """
+        if cls._session is None and name:
+            print(f"[SESSION_MGR] Création unique session pour: {name}")
+            cls._session = GameSession(name)
+        elif cls._session and name and cls._session.name != name:
+            print(f"[SESSION_MGR] Changement de session: {cls._session.name} → {name}")
+            cls._session = GameSession(name)
+        elif cls._session:
+            print(f"[SESSION_MGR] Réutilisation session existante: {cls._session.name}")
+        
+        return cls._session
+    
+    @classmethod
+    def has_session(cls):
+        """Vérifie si une session existe"""
+        return cls._session is not None
+    
+    @classmethod
+    def get_current_session(cls):
+        """Récupère la session actuelle sans en créer une nouvelle"""
+        return cls._session
+    
+    @classmethod
+    def reset(cls):
+        """Remet à zéro la session (pour debug/tests)"""
+        print("[SESSION_MGR] Reset session")
+        cls._session = None
+    @classmethod
+    def check_existing_saves(cls):
+        return [f[:-5] for f in os.listdir("data") if f.endswith(".json")]
+
+    @classmethod
+    def create_player_files(cls, name):
+        with open(get_grimoire_path(name), "w") as f:
+            f.write(f"# Grimoire de {name}\n\n")
+        player_data = {"name": name, "progress": {}, "bust": {}, "sprite": {}}
+        with open(get_player_data_path(name), "w", encoding="utf-8") as f:
+            json.dump(player_data, f, indent=4)
 
 class GameSession:
     def update_tile_pos(self, x, y, z=0, map_name=None):
@@ -82,14 +138,11 @@ class GameSession:
     def __init__(self, player_name):
         self.name = player_name
         # Correction : charge la map via Zone
-        zone = Zone("clairiere")
-        zone._load_map_and_build_grid()
-        self.map = zone.grid_layers
-        if self.map and len(self.map) > 0:
-            self.grid = self.map[0]  # Layer sol
-        else:
-            print(f"[SESSION] Aucune grille de map chargée depuis clairiere")
-            self.grid = []
+        world = World()  # Uses "clairiere" as default map
+        # World loads automatically, no need to call load()
+        # Simplification : plus de map complexe, juste une grille basique
+        self.map = [[1 for _ in range(20)] for _ in range(20)]  # Grille 20x20 simple
+        self.grid = self.map
         self.data_path = get_player_data_path(player_name)
         self.sprite_path = get_player_sprite_path(player_name)
 

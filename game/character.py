@@ -1,29 +1,30 @@
 import pygame
 import math
-from core.settings import LAYER_HEIGHT
+
+
 
 
 class Character:
-    def __init__(self, session, world_manager, speed=3.0):  # speed en tuiles/seconde (2x plus rapide)
+    def __init__(self, session, world_manager, speed=3.0):
         self.session = session
         self.world_manager = world_manager
         self.name = session.name
         self.sprite_path = session.sprite_path
         
-        # Position logique UNIQUEMENT (flottante pour fluidité)
+        # Position logique simplifiée (x, y uniquement)
         spawn_x, spawn_y = self.world_manager.get_spawn_position()
-        spawn_layer = self.world_manager.get_spawn_layer()
         self.position = {
             "x": float(spawn_x), 
-            "y": float(spawn_y), 
-            "layer": spawn_layer
+            "y": float(spawn_y)
         }
-        
-        print(f"[CHAR] Init: position logique ({spawn_x}, {spawn_y}) layer {spawn_layer}")
-        
-        # Timers et protections
-        self.spawn_protection_timer = 1000
-        self.last_spawn_time = pygame.time.get_ticks()
+        self.combat_tile_x = 0
+        self.combat_tile_y = 4
+        self.current_hp = 2
+        self.max_hp = 2
+        self.current_frame = 0
+        self.energie = 1
+
+        print(f"[CHAR] Init: position logique ({spawn_x}, {spawn_y})")
         
         # Sprite et animations
         self.sprite_sheet = pygame.image.load(session.data["sprite_path"]).convert_alpha()
@@ -39,7 +40,45 @@ class Character:
         self.direction = "front"
         self.input_vector = (0.0, 0.0)
         self.moving = False
-        self.speed = speed  # tuiles/seconde
+        self.speed = speed
+    # === COMPORTEMENT EN COMBAT ===
+    def get_current_frame(self):
+        frames = self.animations.get(self.anim_state)
+        return self.frames[frames[self.anim_index % len(frames)]] if frames else self.frames[0]
+    
+    def combat_move_set(self, dx, dy):
+        #liste de differents mouvements possibles pour affichage
+        movements = {
+            "up": (0, -1),
+            "down": (0, 1),
+            "left": (-1, 0),
+            "right": (1, 0)
+        }
+        #calculer la direction du mouvement
+        for direction, (mx, my) in movements.items():
+            if dx == mx and dy == my:
+                print(f"[COMBAT] Mouvement en {direction} activé")
+                return direction
+        print("[COMBAT] Aucun mouvement valide")
+        return None
+    def combat_attack_set(self, dx, dy):
+        # Liste des directions d'attaque possibles pour affichage
+        attacks = {
+            "up": (0, -1),
+            "down": (0, 1),
+            "left": (-1, 0),
+            "right": (1, 0)
+        }
+        # Calculer la direction de l'attaque
+        for direction, (mx, my) in attacks.items():
+            if dx == mx and dy == my:
+                print(f"[COMBAT] Attaque en {direction} activée")
+                return direction
+        print("[COMBAT] Aucun mouvement valide")
+        return None
+    @property
+    def is_alive(self):
+        return self.current_hp > 0
 
     # === CHARGEMENT DES RESSOURCES ===
     
@@ -111,11 +150,11 @@ class Character:
         elif grid_dx > tolerance:
             return "backleft" # NE dominant
         elif grid_dx < -tolerance:
-            return "frontleft"   # SW dominant
+            return "frontright"   # SW dominant
         elif grid_dy > tolerance:
             return "backright"  # NW dominant
         elif grid_dy < -tolerance:
-            return "frontright"  # SE dominant
+            return "frontleft"  # SE dominant
 
         return self.direction
 
@@ -128,49 +167,28 @@ class Character:
         if self.moving:
             self.move(dt)
         self.update_animation(dt)
-        
-        # Vérifier et corriger le layer actuel si nécessaire
-        self._verify_current_layer()
-        
         # Vérifier les transitions (position entière pour la logique)
         current_tile_x = int(round(self.position["x"]))
         current_tile_y = int(round(self.position["y"]))
-        transition = self.world_manager.check_transition(current_tile_x, current_tile_y)
-        if transition:
-            self._handle_transition(transition)
 
-    def _verify_current_layer(self):
-        """Vérifie que le layer courant correspond à la position actuelle"""
-        current_tile_x = int(round(self.position["x"]))
-        current_tile_y = int(round(self.position["y"]))
-        
-        # Rechercher toutes les tuiles walkable à la position actuelle
-        tiles_here = [t for t in self.world_manager.zone.get_all_tiles_with_pos() 
-                     if t["x"] == current_tile_x and t["y"] == current_tile_y and t["is_walkable"]]
-        
-        if tiles_here:
-            # Vérifier si le layer actuel est valide
-            valid_layers = [t["z"] for t in tiles_here]
-            if self.position["layer"] not in valid_layers:
-                # Corriger vers le layer le plus haut disponible
-                highest_layer = max(valid_layers)
-                print(f"[CHAR] Correction layer: L{self.position['layer']} -> L{highest_layer}")
-                self.position["layer"] = highest_layer
 
     # === SYSTÈME DE MOUVEMENT ===
     
-    def _handle_transition(self, transition):
-        print(f"[TRANSITION] Passage vers {transition['target_map']}")
-        self.world_manager.change_zone(transition['target_map'])
-        spawn_x, spawn_y = self.world_manager.get_spawn_position()
-        spawn_layer = self.world_manager.get_spawn_layer()
-        self.position = {
-            "x": float(spawn_x), 
-            "y": float(spawn_y), 
-            "layer": spawn_layer
-        }
-        self.last_spawn_time = pygame.time.get_ticks()
+    # === SYSTÈME DE MOUVEMENT HYBRIDE ===
+    # 
+    # LOGIQUE HYBRIDE FLOAT + INT :
+    # - Position du personnage : stockée en float pour la fluidité (ex: 15.6, 12.3)
+    # - Grille du monde : en coordonnées entières (ex: tuile (16, 12))
+    # - Collision : testée uniquement lors du franchissement d'une frontière de tuile entière
+    # 
+    # AVANTAGES :
+    # 1. Fluidité : le personnage se déplace de manière continue en float
+    # 2. Performance : collision testée seulement aux changements de tuile (pas à chaque frame)
+    # 3. Précision : logique de collision basée sur des tuiles entières discrètes
+    # 4. Robustesse : évite les micro-déplacements et les tests redondants
+    #
     
+
     def move(self, dt):
         # Mouvement linéaire fluide sur la grille isométrique logique
         grid_dx, grid_dy = self.input_vector
@@ -185,23 +203,15 @@ class Character:
         new_pos_x = self.position["x"] + grid_dx * movement_distance
         new_pos_y = self.position["y"] + grid_dy * movement_distance
         
-        # Comparaison flottante pour la collision (plus d'arrondis)
-        current_tile_x = self.position["x"]
-        current_tile_y = self.position["y"]
-        target_tile_x = new_pos_x
-        target_tile_y = new_pos_y
-
-        # Tester collision seulement si changement de tuile (flottant)
-        if (target_tile_x != current_tile_x) or (target_tile_y != current_tile_y):
-            result = self.world_manager.can_move(
-                current_tile_x, current_tile_y,
-                target_tile_x, target_tile_y, self.position["layer"])
-            if not result["can_move"]:
-                return  # Mouvement bloqué
-            self.position["layer"] = result["target_layer"]
-            print(f"[MOVE] Layer mis à jour: L{self.position['layer']} ({result['reason']})")
-
-        # Mise à jour de la position logique (toujours en float)
+        # === LOGIQUE HYBRIDE : Test de collision uniquement lors du franchissement de frontière ===
+        
+        # Tuile actuelle et tuile cible (positions entières)
+        current_tile_x = int(self.position["x"]) if self.position["x"] >= 0 else int(self.position["x"] - 1)
+        current_tile_y = int(self.position["y"]) if self.position["y"] >= 0 else int(self.position["y"] - 1)
+        next_tile_x = int(new_pos_x) if new_pos_x >= 0 else int(new_pos_x - 1)
+        next_tile_y = int(new_pos_y) if new_pos_y >= 0 else int(new_pos_y - 1)
+        
+        # Mise à jour de la position logique (toujours en float pour la fluidité)
         self.position["x"] = new_pos_x
         self.position["y"] = new_pos_y
 
@@ -243,8 +253,7 @@ class Character:
     def get_render_position(self):
         """Calcule la position pixel pour le rendu à partir de la position logique"""
         pixel_x, pixel_y = self.world_manager.tile_to_pixel(self.position["x"], self.position["y"])
-        height_offset = -(self.position["layer"] * LAYER_HEIGHT)
-        return pixel_x, pixel_y + height_offset
+        return pixel_x, pixel_y
 
     def draw(self, surface, camera):
         frame = self.get_current_frame()
@@ -260,7 +269,7 @@ class Character:
         font = pygame.font.SysFont("Arial", 14, bold=True)
         
         # Position logique
-        pos_text = f"Position: ({self.position['x']:.2f}, {self.position['y']:.2f}) Layer: L{self.position['layer']}"
+        pos_text = f"Position: ({self.position['x']:.2f}, {self.position['y']:.2f})"
         pos_surface = font.render(pos_text, True, (255, 255, 0))
         surface.blit(pos_surface, (10, 10))
         
