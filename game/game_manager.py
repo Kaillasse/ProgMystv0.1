@@ -11,7 +11,7 @@ from core.settings import get_player_data_path
 from game.world import World
 from game.character import Character
 from game.camera import Camera
-from game.pnj_manager import PNJManager
+from game.entity import PNJManager
 from game.combat_manager import SimpleCombatManager
 
 def load_player_data(name):
@@ -36,11 +36,10 @@ class GameManager:
         self.npc_manager = None
         self.combat_manager = None
         
-        # Interface de dialogue
-        self.interaction_ui = InteractionUI(screen.get_width(), screen.get_height())
+        # Interface de dialogue - sera réinitialisée avec session dans run()
+        self.interaction_ui = None
         
-        # Configurer le callback pour les actions spéciales du dialogue
-        self.interaction_ui.action_callback = self.handle_dialogue_action
+        # Configurer le callback sera fait lors de l'initialisation dans initialize_world()
         
         print(f"[GM] GameManager prêt pour session: {self.name}")
 
@@ -97,7 +96,13 @@ class GameManager:
             self.world.session = self.session  # Donner accès à la session
             # Initialiser le PNJManager
             self.npc_manager = PNJManager(self.world)
-            self.npc_manager.load_npcs()  # Méthode simplifiée
+            self.npc_manager.spawn_npcs()  # Méthode simplifiée
+            
+            # Initialiser l'InteractionUI avec la session
+            if self.interaction_ui is None:
+                self.interaction_ui = InteractionUI(self.screen.get_width(), self.screen.get_height(), session=self.session)
+                # Configurer le callback pour les actions spéciales du dialogue
+                self.interaction_ui.action_callback = self.handle_dialogue_action
         return self.world
 
     def initialize_character(self):

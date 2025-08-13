@@ -1,6 +1,7 @@
 import os
 import pygame
 from ui.uitools import BorderManager
+from core.settings import FONTS
 
 # Import des arbres de dialogue
 from game.pnj.dame_indenta import dame_indenta_dialogue_tree
@@ -16,8 +17,8 @@ class DialogueButton:
         self.action = action
         self.rect = rect
         self.hovered = False
-        self.font = pygame.font.Font(None, 28)
-        
+        self.font = pygame.font.Font(FONTS["default"], 28)
+
     def update(self, mouse_pos):
         """Met à jour l'état hover du bouton"""
         self.hovered = self.rect.collidepoint(mouse_pos)
@@ -45,13 +46,13 @@ class DialogueButton:
 class InteractionUI:
     """Interface utilisateur pour les dialogues entre le joueur et les PNJ"""
     
-    def __init__(self, screen_width=800, screen_height=600):
+    def __init__(self, screen_width=800, screen_height=600, session=None):
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.is_active = False
         
         # Gestionnaire de bordures
-        self.border_manager = BorderManager()
+        self.border_manager = BorderManager(session=session)
         
         # Images de bustes
         self.character_bust = None
@@ -64,8 +65,8 @@ class InteractionUI:
         self.response_buttons = []
         
         # Polices
-        self.dialogue_font = pygame.font.Font(None, 32)
-        self.name_font = pygame.font.Font(None, 36)
+        self.dialogue_font = pygame.font.Font(FONTS['default'], 32)
+        self.name_font = pygame.font.Font(FONTS['title'], 36)
         
         # Couleurs
         self.bg_color = (0, 0, 0, 180)  # Semi-transparent
@@ -106,7 +107,7 @@ class InteractionUI:
 
     def _build_dialogue_tree(self, npc, session):
         """Construit l'arbre de dialogue pour le PNJ donné"""
-        if npc.name == "Dame Indenta":
+        if npc.name == "DameIndenta":
             return dame_indenta_dialogue_tree
         elif npc.name == "Neuill":
             return neuill_dialogue_tree

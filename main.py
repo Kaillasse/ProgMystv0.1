@@ -19,7 +19,7 @@ def main():
     if not saves:
         name = ask_player_name(screen)
         if name:
-            session.create_player_files(name)
+            SessionManager.create_player_files(name)
             session = SessionManager.get_session(name)
             CharacterCreator(screen, session).run()
     else:

@@ -4,18 +4,20 @@ import os
 from core.settings import TILE_WIDTH, TILE_HEIGHT, grid_to_iso, iso_to_grid
 
 class World:
-    """
-    Gestionnaire unifié du monde - charge la vraie map clairiere
-    Convention : la position courante de tout personnage (PNJ ou joueur) est toujours dans tile_pos (en tuiles, [x, y] ou (x, y)).
-    Toutes les conversions tuile→pixel passent par tile_to_pixel().
-    start_tile et combat_start_tile servent uniquement à l'initialisation ou au reset.
-    """
+
     LAYER_Z_OFFSET = 16
     def __init__(self, screen=None):
         self.tile_folder = os.path.join("assets", "tiles")
-        self.screen = screen
+        self.screen = screen or pygame.display.get_surface()
         self.tile_images = []
-        self.spawn_point = (0, 0)
+        # Nouvelle structure centralisée : liste de tuples (entité ou classe, (x, y))
+        self.spawn_point = {
+            "joueur": (0, 0),
+            "DameIndenta": (4, 8),
+            "Neuill": (1, 6),
+            "JSON": (3, 6),
+            "Loopfang": (1, 8),
+        }
         self._tiles_cache = None
         self.screen_center_x = 400
         self.screen_center_y = 200
@@ -27,63 +29,44 @@ class World:
         self._init_background()
 
     def load(self):
-        """Charge la vraie map clairière depuis le fichier JSON"""
+        """Charge la map et les tuiles"""
         self._load_tiles()
         self._load_map_from_json()
 
     def _load_map_from_json(self):
-        """Charge la vraie map clairière depuis data/map/clairiere.json"""
+        """Charge la map depuis data/map/clairiere.json ou crée une grille par défaut"""
         map_path = "data/map/clairiere.json"
         try:
             if not os.path.exists(map_path):
                 print(f"[WORLD] Fichier map '{map_path}' introuvable, création d'une grille par défaut")
                 self._create_default_grid()
                 return
-                
             with open(map_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
             print(f"[WORLD] Chargement de la map depuis {map_path}")
-            
-            # Extraire les layers de tuiles
             tiles = []
-            layer_count = 0
-            
-            for layer in data.get("layers", []):
-                if layer.get("type") != "tilelayer":
-                    continue
-                    
-                width = layer.get("width", 0)
-                height = layer.get("height", 0)
+            for layer_count, layer in enumerate([l for l in data.get("layers", []) if l.get("type") == "tilelayer"]):
+                width, height = layer.get("width", 0), layer.get("height", 0)
                 layer_data = layer.get("data", [])
-                
                 print(f"[WORLD] Layer {layer_count}: {width}x{height}, {len(layer_data)} tuiles")
-                
-                # Convertir les données du layer en tuiles positionnées
                 for y in range(height):
                     for x in range(width):
-                        if y * width + x < len(layer_data):
-                            tile_id = layer_data[y * width + x]
-                            if tile_id > 0:  # Ignorer les tuiles vides
-                                # Coordonnées monde centrées (spawn au centre)
-                                world_x = x - (width // 2) + self.spawn_point[0]
-                                world_y = y - (height // 2) + self.spawn_point[1]
-                                
-                                tile_info = {
+                        idx = y * width + x
+                        if idx < len(layer_data):
+                            tile_id = layer_data[idx]
+                            if tile_id > 0:
+                                world_x = x - (width // 2) + self.spawn_point["joueur"][0]
+                                world_y = y - (height // 2) + self.spawn_point["joueur"][1]
+                                tiles.append({
                                     "x": world_x,
                                     "y": world_y,
                                     "z": layer_count,
                                     "tile_id": tile_id,
                                     "is_walkable": self._is_walkable_tile(tile_id)
-                                }
-                                tiles.append(tile_info)
-                
-                layer_count += 1
-            
+                                })
             self._tiles_cache = tiles
-            print(f"[WORLD] Map 'clairiere' chargée: {len(tiles)} tuiles, {layer_count} layers")
-            
-        except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+            print(f"[WORLD] Map 'clairiere' chargée: {len(tiles)} tuiles, {layer_count+1} layers")
+        except Exception as e:
             print(f"[WORLD] Erreur chargement map clairiere: {e}")
             self._create_default_grid()
 
@@ -95,57 +78,41 @@ class World:
                 print(f"[WORLD] Dossier tuiles '{self.tile_folder}' introuvable")
                 self._create_default_tiles()
                 return
-                
-            tile_files = [f for f in sorted(os.listdir(self.tile_folder)) 
-                         if f.endswith(".png") and f.startswith("tile_")]
-            
+            tile_files = [f for f in sorted(os.listdir(self.tile_folder)) if f.endswith(".png") and f.startswith("tile_")]
             if not tile_files:
                 print("[WORLD] Aucune tuile trouvée dans assets/tiles/")
                 self._create_default_tiles()
                 return
-                
             for filename in tile_files:
                 path = os.path.join(self.tile_folder, filename)
                 img = pygame.image.load(path).convert_alpha()
                 img = pygame.transform.scale(img, (TILE_WIDTH, TILE_HEIGHT))
                 self.tile_images.append(img)
-                
             print(f"[WORLD] {len(self.tile_images)} tuiles chargées depuis {self.tile_folder}")
-            
-        except (FileNotFoundError, OSError) as e:
+        except Exception as e:
             print(f"[WORLD] Erreur chargement tuiles: {e}")
             self._create_default_tiles()
 
     def _is_walkable_tile(self, tile_id):
         """Détermine si une tuile est walkable"""
-        if tile_id <= 0:
-            return False
-        # Tuiles non-walkable (à adapter selon tes IDs de tuiles)
-        non_walkable_tiles = {91, 92, 93, 94, 95, 101, 102, 103, 104}  # Exemple: pierre, eau, etc.
-        return tile_id not in non_walkable_tiles
+        return tile_id > 0 and tile_id not in {91, 92, 93, 94, 95, 101, 102, 103, 104}
 
     def _init_background(self):
         """Initialise l'arrière-plan avec nuages"""
-        if not self.screen:
-            self.screen = pygame.display.get_surface()
-        
         try:
             self.bg_img = pygame.image.load("assets/cloud/1.png").convert()
             screen_size = self.screen.get_size()
             self.bg_img = pygame.transform.scale(self.bg_img, screen_size)
-            
             self.cloud_imgs = [pygame.image.load(f"assets/cloud/{i}.png").convert_alpha() for i in (2, 3)]
             self.cloud_pos = [
                 [-self.cloud_imgs[0].get_width(), screen_size[1] - self.cloud_imgs[0].get_height() - 50],
                 [screen_size[0], screen_size[1] - self.cloud_imgs[1].get_height() - 120]
             ]
-            self.cloud_speed = [0.3, -0.2]
-        except FileNotFoundError:
+        except Exception:
             print("[WORLD] Impossible de charger les images de nuages")
-            # Créer un fond par défaut
             screen_size = self.screen.get_size() if self.screen else (800, 600)
             self.bg_img = pygame.Surface(screen_size)
-            self.bg_img.fill((135, 206, 235))  # Bleu ciel
+            self.bg_img.fill((135, 206, 235))
             self.cloud_imgs = []
             self.cloud_pos = []
 
@@ -166,8 +133,14 @@ class World:
                         self.cloud_pos[i][0] = screen_width
                 screen.blit(cloud, (int(self.cloud_pos[i][0]), int(self.cloud_pos[i][1])))
 
+    def get_grid_position(self, entity):
+        """MÉTHODE UNIFIÉE : Position entière standardisée pour toutes les entités"""
+        if hasattr(entity, 'tile_pos'):
+            return (int(round(entity.tile_pos[0])), int(round(entity.tile_pos[1])))
+        return (0, 0)
+    
     def tile_to_pixel(self, tile_x, tile_y):
-        """Convertit coordonnées tuile vers pixel isométrique (utiliser partout pour PNJ, joueur, etc.)"""
+        """Convertit coordonnées tuile vers pixel isométrique"""
         iso_x, iso_y = grid_to_iso(tile_x, tile_y, TILE_WIDTH, TILE_HEIGHT)
         return iso_x + self.screen_center_x, iso_y + self.screen_center_y
     
@@ -237,11 +210,11 @@ class World:
         return [t for t in self.get_all_tiles_with_pos() 
                 if t["x"] == grid_x and t["y"] == grid_y]
 
-    def get_spawn_position(self):
-        """Retourne la position de spawn (garantie valide)"""
-        # Vérifier si spawn_point est valide
-        if self.is_valid_tile_position(*self.spawn_point):
-            return self.spawn_point
+    def get_spawn_position(self, entity_name="joueur"):
+        pos = self.spawn_point.get(entity_name)
+        if pos and self.is_valid_tile_position(pos[0], pos[1]):
+            return pos
+        raise ValueError(f"Spawn point not found for entity: {entity_name}")
 
     def get_spawn_layer(self):
         """Retourne le layer de spawn (toujours 0 maintenant)"""
@@ -254,3 +227,59 @@ class World:
     def is_valid_tile_position(self, x, y):
         """Vérifie qu'une position correspond à une tuile valide dans le cache"""
         return any(t["x"] == x and t["y"] == y for t in self.get_all_tiles_with_pos())
+    
+    # === MÉTHODES UNIFIÉES POUR LES ENTITÉS ===
+    
+    def get_entity_pixel_pos(self, tile_x, tile_y, camera_offset=(0, 0)):
+        """UNIQUE MÉTHODE de conversion tuile→pixel pour TOUTES les entités"""
+        pixel_x, pixel_y = self.tile_to_pixel(tile_x, tile_y)
+        return pixel_x + camera_offset[0], pixel_y + camera_offset[1]
+    
+    def sync_combat_positions(self, entities):
+        """Synchronise les positions de combat avec les positions monde pour toutes les entités"""
+        for entity in entities:
+            if hasattr(entity, 'tile_pos') and hasattr(entity, 'combat_tile_x'):
+                grid_x, grid_y = self.get_grid_position(entity)
+                entity.combat_tile_x = grid_x
+                entity.combat_tile_y = grid_y
+                print(f"[WORLD] Sync combat: {getattr(entity, 'name', 'Entity')} -> combat({entity.combat_tile_x}, {entity.combat_tile_y})")
+    
+    def validate_entity_positions(self, entities):
+        """DEBUG : Valide et affiche les positions de toutes les entités"""
+        print("[WORLD] === VALIDATION DES POSITIONS ===")
+        for entity in entities:
+            name = getattr(entity, 'name', 'Unknown')
+            
+            if hasattr(entity, 'tile_pos'):
+                # Position grille standardisée
+                grid_x, grid_y = self.get_grid_position(entity)
+                # Position pixel calculée
+                pixel_x, pixel_y = self.get_entity_pixel_pos(entity.tile_pos[0], entity.tile_pos[1])
+                # Position combat
+                combat_pos = f"combat({getattr(entity, 'combat_tile_x', '?')}, {getattr(entity, 'combat_tile_y', '?')})"
+                
+                print(f"[WORLD] {name}: tile_pos({entity.tile_pos[0]:.2f}, {entity.tile_pos[1]:.2f}) | grid({grid_x}, {grid_y}) | {combat_pos} | pixel({pixel_x:.1f}, {pixel_y:.1f})")
+            else:
+                print(f"[WORLD] {name}: NO tile_pos!")
+        print("[WORLD] === FIN VALIDATION ===")
+        
+    # === MÉTHODES MANQUANTES (fallback) ===
+    
+    def _create_default_grid(self):
+        """Crée une grille par défaut si aucune map n'est trouvée"""
+        print("[WORLD] Création d'une grille par défaut 10x10")
+        tiles = []
+        for y in range(-5, 5):
+            for x in range(-5, 5):
+                tiles.append({
+                    "x": x, "y": y, "z": 0,
+                    "tile_id": 1, "is_walkable": True
+                })
+        self._tiles_cache = tiles
+    
+    def _create_default_tiles(self):
+        """Crée des tuiles par défaut si aucune image n'est trouvée"""
+        print("[WORLD] Création de tuiles par défaut")
+        default_tile = pygame.Surface((TILE_WIDTH, TILE_HEIGHT))
+        default_tile.fill((100, 200, 100))  # Vert
+        self.tile_images = [default_tile]

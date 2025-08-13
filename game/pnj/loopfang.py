@@ -2,17 +2,17 @@ import pygame
 import os
 from core.settings import get_grimoire_path
 from core.analyze import analyser_script
+from game.entity import Entity
 
-class Loopfang:
-    def __init__(self, name="Loopfang", sprite_path="assets/pnj/loopfang/loopfang_sprite.png", bust_path="assets/pnj/loopfang/loopfang_bust.png",
-                 start_tile=(1, 8), combat_start_tile=(4, 2)):
-        self.name = name
+class Loopfang(Entity):
+    def __init__(self, name="Loopfang", sprite_path="assets/pnj/loopfang/loopfang_sprite.png",
+                 bust_path="assets/pnj/loopfang/loopfang_bust.png",
+                 combat_start_tile=(4, 2), tile_pos=(1, 8)):
+
+        super().__init__(tile_pos, name)
         self.sprite_path = sprite_path
         self.bust_path = bust_path
-        self.map_name = "clairiere"
-        self.start_tile = start_tile
-        self.combat_start_tile = combat_start_tile  # Position pour le mode combat
-        self.tile_pos = list(self.start_tile)
+        self.combat_start_tile = combat_start_tile
         self.quest_progress_key = "loopfang_progress"
         self.dialog_state = 0
         self.has_given_quests = False

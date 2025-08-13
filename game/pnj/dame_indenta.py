@@ -1,23 +1,30 @@
 import pygame
+from game.entity import Entity
 
 
-class DameIndenta:
-    def __init__(self, name="Dame Indenta", sprite_path="assets/pnj/di/di_sprite.png", bust_path="assets/pnj/di/di_bust.png",
-                 start_tile=(4, 8), combat_start_tile=(2, 2)):
-        self.name = name
+class DameIndenta(Entity):
+    def __init__(self, tile_pos, name="Dame Indenta", sprite_path="assets/pnj/di/di_sprite.png",
+                 bust_path="assets/pnj/di/di_bust.png", combat_start_tile=(2, 2)):
+        
+        # Initialisation de la classe Entity
+        super().__init__(tile_pos, name)
+        
+        # Attributs spécifiques à Dame Indenta
         self.sprite_path = sprite_path
         self.bust_path = bust_path
-        self.map_name = "clairiere"
-        self.start_tile = start_tile
-        self.combat_tile_x = combat_start_tile[0]  # Position pour le mode combat
-        self.combat_tile_y = combat_start_tile[1]  # Position pour le mode combat
-        self.tile_pos = list(self.start_tile)
         self.quest_progress_key = "dame_indenta_progress"
         self.dialog_state = 0
         self.has_given_quests = False
+        
+        # Combat stats (héritées mais redéfinies)
+        self.current_hp = 2
+        self.max_hp = 2
+        
+        # Chargement des ressources
         self.sprite = self._load_image(self.sprite_path)
         self.bust = self._load_image(self.bust_path)
         
+        # Animation
         self.frame_width = 48
         self.frame_height = 96
         self.columns = 12
@@ -30,13 +37,7 @@ class DameIndenta:
         self.frame_index = 0
         self.frame_timer = 0
         self.frame_delay = 500  # ms entre les frames
-        self.current_hp = 2
-        self.max_hp = 2
         self.current_frame = 0
-
-    @property
-    def is_alive(self):
-        return self.current_hp > 0
 
     def _load_image(self, path):
         if path:
@@ -119,7 +120,8 @@ class DameIndenta:
 
     def move(self, dx, dy):
         """Déplace Dame Indenta sur la grille de combat"""
-        self.combat_start_tile = (self.combat_start_tile[0] + dx, self.combat_start_tile[1] + dy)
+        self.combat_tile_x += dx
+        self.combat_tile_y += dy
         return True
     
     def attack(self, target):
@@ -135,18 +137,18 @@ class DameIndenta:
 # Chaque clé est un noeud, chaque valeur contient le texte et 3 réponses possibles
 dame_indenta_dialogue_tree = {
     "start": {
-        "text": "Hmm alors c'est toi le nouvel apprenti ! Que veux-tu faire ?",
+        "text": "print('Bonjour, apprenti !')",
         "responses": [
-            {"label": "Où suis-je ?", "next": "talk1"},
-            {"label": "Battons-nous !", "action": "start_combat_with_dame_indenta"},
+            {"label": "heu boujour?", "next": "quest1"},
+            {"label": "¿print(?¿", "next": "quest1"},
             {"label": "Quitter", "action": "end"}
         ]
     },
     "quest1": {
-        "text": "Voici ta première quête : Utilise deux variables et affiche-les avec print().",
+        "text": "Oui! Voici c'est première quête : utilise le print() pour communiquer via le grand Terminal.",
         "responses": [
             {"label": "Merci !", "next": "start"},
-            {"label": "Une autre quête", "next": "quest2"},
+            {"label": "heu..?", "next": "talk2"},
             {"label": "Fermer", "action": "end"}
         ]
     },
@@ -190,4 +192,12 @@ dame_indenta_dialogue_tree = {
             {"label": "Plus tard", "action": "end"}
         ]
     },
+    "talk2": {
+        "text": "La programmation est un voyage ! N'oublie pas de t'amusééééégfeezéééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééér.",
+        "responses": [
+            {"label": "Merci pour le conseil", "next": "start"},
+            {"label": "Un autre conseil", "next": "tip2"},
+            {"label": "Fermer", "action": "end"}
+        ]
+    }
 }

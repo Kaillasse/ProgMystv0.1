@@ -1,30 +1,32 @@
 import pygame
 import math
+from game.entity import Entity
 
 
 
 
-class Character:
+class Character(Entity):
     def __init__(self, session, world_manager, speed=3.0):
+        # Récupération du spawn depuis World
+        spawn_x, spawn_y = world_manager.get_spawn_position('joueur')
+        
+        # Initialisation Entity avec position et nom
+        super().__init__([spawn_x, spawn_y], session.name)
+        
+        # Attributs spécifiques au Character
         self.session = session
         self.world_manager = world_manager
-        self.name = session.name
         self.sprite_path = session.sprite_path
         
-        # Position logique simplifiée (x, y uniquement)
-        spawn_x, spawn_y = self.world_manager.get_spawn_position()
-        self.position = {
-            "x": float(spawn_x), 
-            "y": float(spawn_y)
-        }
-        self.combat_tile_x = 0
-        self.combat_tile_y = 4
+        # Stats de combat (redéfinition des valeurs Entity)
         self.current_hp = 2
         self.max_hp = 2
-        self.current_frame = 0
         self.energie = 1
-
-        print(f"[CHAR] Init: position logique ({spawn_x}, {spawn_y})")
+        
+        # Synchronisation automatique via World
+        self.world_manager.sync_combat_positions([self])
+        
+        print(f"[CHAR] Init: position unifiée ({spawn_x}, {spawn_y}) via World")
         
         # Sprite et animations
         self.sprite_sheet = pygame.image.load(session.data["sprite_path"]).convert_alpha()
@@ -161,15 +163,18 @@ class Character:
     # === MISE À JOUR DU PERSONNAGE ===
     
     def update(self, dt):
+        """Update unifié utilisant les méthodes de World"""
         keys = pygame.key.get_pressed()
         self.handle_input(keys)
         self.anim_state = f"walk_{self.direction}" if self.moving else f"idle_{self.direction}"
         if self.moving:
             self.move(dt)
+            # Synchronisation moins fréquente via World après mouvement
+            # On ne synchronise que si la position de grille a changé
+            new_grid_x, new_grid_y = self.world_manager.get_grid_position(self)
+            if (new_grid_x != self.combat_tile_x or new_grid_y != self.combat_tile_y):
+                self.world_manager.sync_combat_positions([self])
         self.update_animation(dt)
-        # Vérifier les transitions (position entière pour la logique)
-        current_tile_x = int(round(self.position["x"]))
-        current_tile_y = int(round(self.position["y"]))
 
 
     # === SYSTÈME DE MOUVEMENT ===
@@ -190,30 +195,18 @@ class Character:
     
 
     def move(self, dt):
-        # Mouvement linéaire fluide sur la grille isométrique logique
+        """Mouvement fluide unifié"""
         grid_dx, grid_dy = self.input_vector
         if grid_dx == 0 and grid_dy == 0:
             return
             
-        # Calculer le déplacement en tuiles de grille
+        # Calcul mouvement simplifié
         dt_seconds = dt / 1000.0
         movement_distance = self.speed * dt_seconds
         
-        # Nouvelle position flottante sur la grille isométrique
-        new_pos_x = self.position["x"] + grid_dx * movement_distance
-        new_pos_y = self.position["y"] + grid_dy * movement_distance
-        
-        # === LOGIQUE HYBRIDE : Test de collision uniquement lors du franchissement de frontière ===
-        
-        # Tuile actuelle et tuile cible (positions entières)
-        current_tile_x = int(self.position["x"]) if self.position["x"] >= 0 else int(self.position["x"] - 1)
-        current_tile_y = int(self.position["y"]) if self.position["y"] >= 0 else int(self.position["y"] - 1)
-        next_tile_x = int(new_pos_x) if new_pos_x >= 0 else int(new_pos_x - 1)
-        next_tile_y = int(new_pos_y) if new_pos_y >= 0 else int(new_pos_y - 1)
-        
-        # Mise à jour de la position logique (toujours en float pour la fluidité)
-        self.position["x"] = new_pos_x
-        self.position["y"] = new_pos_y
+        # Mise à jour position unifiée
+        self.tile_pos[0] += grid_dx * movement_distance
+        self.tile_pos[1] += grid_dy * movement_distance
 
     # === SYSTÈME DE COLLISION ET CHUTE ===
     
@@ -223,13 +216,12 @@ class Character:
         if fall_destination:
             self.world_manager.change_zone(fall_destination)
             spawn_x, spawn_y = self.world_manager.get_spawn_position()
-            spawn_layer = self.world_manager.get_spawn_layer()
-            self.position = {
-                "x": float(spawn_x), 
-                "y": float(spawn_y), 
-                "layer": spawn_layer
-            }
-            print(f"[CHAR.trigger_fall] Respawn à ({spawn_x}, {spawn_y}) layer {spawn_layer}")
+            # NOUVEAU : Position unifiée avec tile_pos
+            self.tile_pos = [float(spawn_x), float(spawn_y)]
+            # Synchroniser les positions de combat
+            self.combat_tile_x = spawn_x
+            self.combat_tile_y = spawn_y
+            print(f"[CHAR.trigger_fall] Respawn à ({spawn_x}, {spawn_y}) - position unifiée")
 
     # === ANIMATION ===
     
@@ -244,43 +236,46 @@ class Character:
             self.anim_timer = 0
             self.anim_index = (self.anim_index + 1) % len(frames)
 
-    def get_current_frame(self):
-        frames = self.animations.get(self.anim_state)
-        return self.frames[frames[self.anim_index % len(frames)]] if frames else self.frames[0]
-
-    # === RENDU (conversion tuile→pixel à la volée) ===
+    # === RENDU UNIFIÉ ===
     
     def get_render_position(self):
-        """Calcule la position pixel pour le rendu à partir de la position logique"""
-        pixel_x, pixel_y = self.world_manager.tile_to_pixel(self.position["x"], self.position["y"])
-        return pixel_x, pixel_y
+        """API UNIFIÉE : Position pixel via World (comme PNJs)"""
+        return self.world_manager.get_entity_pixel_pos(self.tile_pos[0], self.tile_pos[1])
 
     def draw(self, surface, camera):
+        """Rendu unifié du Character - compatible avec l'appel depuis game_manager"""
         frame = self.get_current_frame()
         pixel_x, pixel_y = self.get_render_position()
         
+        # Utilise camera.x et camera.y comme avant la refactorisation
         draw_x = pixel_x - camera.x - frame.get_width() // 2
         draw_y = pixel_y - camera.y - frame.get_height() + 16
         
         surface.blit(frame, (draw_x, draw_y))
-        self.draw_debug_info(surface, camera)
+        self.draw_debug_info(surface)
 
-    def draw_debug_info(self, surface, camera):
+    def draw_debug_info(self, surface):
+        """DEBUG UNIFIÉ : Affichage via World (comme PNJs)"""
         font = pygame.font.SysFont("Arial", 14, bold=True)
         
-        # Position logique
-        pos_text = f"Position: ({self.position['x']:.2f}, {self.position['y']:.2f})"
-        pos_surface = font.render(pos_text, True, (255, 255, 0))
-        surface.blit(pos_surface, (10, 10))
+        # Position unifiée via World
+        grid_x, grid_y = self.world_manager.get_grid_position(self)
+        pixel_x, pixel_y = self.get_render_position()
+        combat_pos = f"combat({self.combat_tile_x}, {self.combat_tile_y})"
         
-        # Position entière pour collision
-        tile_x = int(round(self.position["x"]))
-        tile_y = int(round(self.position["y"]))
-        tile_text = f"Tuile collision: ({tile_x}, {tile_y})"
-        tile_surface = font.render(tile_text, True, (255, 255, 0))
-        surface.blit(tile_surface, (10, 25))
+        debug_texts = [
+            f"Character: {self.name}",
+            f"tile_pos: ({self.tile_pos[0]:.2f}, {self.tile_pos[1]:.2f})",
+            f"grid: ({grid_x}, {grid_y})",
+            combat_pos,
+            f"pixel: ({pixel_x:.1f}, {pixel_y:.1f})",
+            f"direction: {self.direction}",
+            f"moving: {self.moving}"
+        ]
         
-        # Vecteur de mouvement (grille isométrique)
-        vector_text = f"Grille: ({self.input_vector[0]:.2f}, {self.input_vector[1]:.2f})"
-        vector_surface = font.render(vector_text, True, (0, 255, 255))
-        surface.blit(vector_surface, (10, 40))
+        for i, text in enumerate(debug_texts):
+            color = (255, 255, 255) if i != 2 else (255, 255, 0)  # Surbrillance pour grid
+            text_surface = font.render(text, True, color)
+            surface.blit(text_surface, (10, 10 + i * 16))
+            text_surface = font.render(text, True, (255, 255, 0))
+            surface.blit(text_surface, (10, 10 + i * 16))

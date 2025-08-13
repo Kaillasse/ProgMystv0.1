@@ -56,7 +56,7 @@ class SessionManager:
     def create_player_files(cls, name):
         with open(get_grimoire_path(name), "w") as f:
             f.write(f"# Grimoire de {name}\n\n")
-        player_data = {"name": name, "progress": {}, "bust": {}, "sprite": {}}
+        player_data = {"name": name, "progress": {}, "bust": {}, "sprite": {}, "border": {}}
         with open(get_player_data_path(name), "w", encoding="utf-8") as f:
             json.dump(player_data, f, indent=4)
 
@@ -215,6 +215,11 @@ class GameSession:
         # 🔁 Ajoute sprite_path si absent (utile pour explorateur)
         if "sprite_path" not in self.data:
             self.data["sprite_path"] = self.sprite_path
+
+        # 🔧 Assure que le champ border existe (rétrocompatibilité)
+        if "border" not in self.data:
+            self.data["border"] = {"current_index": 0}
+            print("[SESSION] Champ 'border' ajouté avec index par défaut 0")
 
         # Position initiale par défaut
         if "position" not in self.data:

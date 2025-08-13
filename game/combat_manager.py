@@ -7,11 +7,26 @@ from game.pnj.dame_indenta import DameIndenta
 from game.world import World
 from ui.uitools import BorderManager
 
+
 class CombatState(Enum):
     PLAYER_TURN = "player_turn"
     ENEMY_TURN = "enemy_turn"
     VICTORY = "victory"
     DEFEAT = "defeat"
+# Dans combat_manager.py
+class CombatEntity:
+    """Mixin pour les capacités de combat"""
+    def prepare_for_combat(self):
+        """Prépare l'entité pour le combat"""
+        pass
+        
+    def get_combat_actions(self):
+        """Retourne les actions disponibles en combat"""
+        return []
+        
+    def execute_action(self, action, target):
+        """Exécute une action de combat"""
+        pass
 
 class CombatAction:
     """Action de combat avec bouton cliquable"""
@@ -37,7 +52,7 @@ class SimpleCombatManager:
 
         # Interface comme interaction.py
         self.is_active = False
-        self.border_manager = BorderManager()
+        self.border_manager = None  # Sera initialisé dans start_combat avec session
         self.font = pygame.font.Font(None, 32)
         self.action_buttons = []
         
@@ -51,41 +66,39 @@ class SimpleCombatManager:
         print("[COMBAT] SimpleCombatManager initialisé")
     
     def start_combat(self, session):
-        """Démarre le combat simplifié contre Dame Indenta"""
+        """Démarre le combat avec synchronisation unifiée via World"""
         print("[COMBAT] === DÉBUT DU COMBAT SIMPLIFIÉ ===")
         
-        # Créer le pion du joueur
-        grimoire = session.data.get('grimoire', {}) if session else {}
+        # Initialiser BorderManager avec la session
+        if not self.border_manager:
+            self.border_manager = BorderManager(session=session)
+        
         self.player_pion = Character(session, self.world_manager)
-
-        # Créer le pion de Dame Indenta
         self.enemy_pion = DameIndenta(self)
-
-        # État initial
+        entities = [self.player_pion, self.enemy_pion]
+        
+        # UTILISATION API UNIFIÉE DE WORLD
+        self.world_manager.sync_combat_positions(entities)
+        self.world_manager.validate_entity_positions(entities)
+        
         self.state = CombatState.PLAYER_TURN
         self.is_active = True
-        
-        # Créer les boutons d'action
         self._create_action_buttons()
-        
         print(f"[COMBAT] Combat démarré - {self.player_pion.name} vs {self.enemy_pion.name}")
-        print(f"[COMBAT] Positions: Joueur({self.player_pion.combat_tile_x}, {self.player_pion.combat_tile_y}) vs Dame({self.enemy_pion.combat_tile_x}, {self.enemy_pion.combat_tile_y})")
 
     def _handle_move_action(self):
         """Gère l'action de mouvement du joueur"""
         if self.player_pion and self.player_pion.energie > 0:
-            # TODO: Implémenter la sélection de tuile pour le mouvement
             print("[COMBAT] Mode sélection de mouvement activé")
-            return None
         else:
             print("[COMBAT] Plus d'énergie pour se déplacer")
             self._end_player_turn()
-            return None
+        return None
 
 
     def _handle_attack_action(self):
         """Gère l'action d'attaque du joueur (buff sur soi-même)"""
-        if self.player_pion and self.player_pion.can_attack(self.player_pion):
+        if self.player_pion and hasattr(self.player_pion, 'can_attack') and self.player_pion.can_attack(self.player_pion):
             success = self.player_pion.attack(self.player_pion)
             if success:
                 print("[COMBAT] Joueur se donne un buff!")
@@ -99,51 +112,30 @@ class SimpleCombatManager:
             self.state = CombatState.ENEMY_TURN
     
     def _create_action_buttons(self):
-        """Crée les boutons d'action comme dans interaction.py"""
+        """Crée les boutons d'action"""
         self.action_buttons = []
-        screen_width = self.screen.get_width()
-        screen_height = self.screen.get_height()
-        
-        button_width = 120
-        button_height = 35
-        button_spacing = 10
-        
-        # Calculer la position des boutons (en bas de l'écran)
-        total_width = len(self.player_actions) * button_width + (len(self.player_actions) - 1) * button_spacing
-        start_x = (screen_width - total_width) // 2
-        button_y = screen_height - 60
-        
+        w, h = self.screen.get_width(), self.screen.get_height()
+        bw, bh, bs = 120, 35, 10
+        total_w = len(self.player_actions) * bw + (len(self.player_actions) - 1) * bs
+        start_x = (w - total_w) // 2
+        y = h - 60
         for i, action in enumerate(self.player_actions):
-            button_x = start_x + i * (button_width + button_spacing)
-            button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
-            
-            button_data = {
-                'rect': button_rect,
-                'action': action,
-                'hovered': False
-            }
-            self.action_buttons.append(button_data)
+            rect = pygame.Rect(start_x + i * (bw + bs), y, bw, bh)
+            self.action_buttons.append({'rect': rect, 'action': action, 'hovered': False})
     
     def update(self):
         """Met à jour la logique du combat"""
         if not self.is_active:
             return
-            
         if self.state == CombatState.ENEMY_TURN:
             self._update_enemy_turn()
-        
-        # Vérifier les conditions de fin
         self._check_victory_conditions()
     
     def _update_enemy_turn(self):
-        """Tour de Dame Indenta (IA surcheatée)"""
+        """Tour de Dame Indenta (IA)"""
         print("[COMBAT] Tour de Dame Indenta")
-        
-        # L'IA utilise maintenant les pions
         action_type, target = self.ai.choose_action(self.enemy_pion, [self.player_pion])
         self.ai.execute_action(self.enemy_pion, action_type, target)
-        
-        # Retour au tour du joueur
         self.state = CombatState.PLAYER_TURN
         print("[COMBAT] Retour au tour du joueur")
 
@@ -163,10 +155,9 @@ class SimpleCombatManager:
             print("[COMBAT] VICTOIRE!")
     
     def handle_event(self, event):
-        """Gère les événements (comme interaction.py)"""
+        """Gère les événements (clics et touches)"""
         if not self.is_active:
             return None
-            
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()
             for button_data in self.action_buttons:
@@ -175,11 +166,8 @@ class SimpleCombatManager:
                     if result == "end_combat":
                         return "end_combat"
                     break
-        
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                return self._abandon_combat()
-        
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            return self._abandon_combat()
         return None
     
     def update_buttons(self, mouse_pos):
@@ -188,26 +176,17 @@ class SimpleCombatManager:
             button_data['hovered'] = button_data['rect'].collidepoint(mouse_pos)
     
     def draw(self, screen):
-        """Affiche le combat avec interface comme interaction.py"""
+        """Affiche le combat et l'interface"""
         if not self.is_active:
             return
-            
-        # Fond semi-transparent
-        overlay = pygame.Surface(screen.get_size())
-        overlay.set_alpha(150)
-        overlay.fill((20, 20, 40))
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((20, 20, 40, 150))
         screen.blit(overlay, (0, 0))
-        
-        # Dessiner les unités (pions)
         if self.player_pion:
             self._draw_pion(screen, self.player_pion)
         if self.enemy_pion:
             self._draw_pion(screen, self.enemy_pion)
-
-        # Interface de combat
         self._draw_combat_ui(screen)
-        
-        # Boutons d'action avec bordures
         for button_data in self.action_buttons:
             self._draw_action_button(screen, button_data)
     
@@ -215,8 +194,8 @@ class SimpleCombatManager:
         # 1. Récupérer le sprite/image à dessiner
         sprite = pion.get_current_frame()  # ou pion.sprite_sheet/frame selon l’animation
 
-        # 2. Convertir la position tuile en position pixel
-        pixel_x, pixel_y = self.world_manager.tile_to_pixel(pion.combat_tile_x, pion.combat_tile_y)
+        # 2. NOUVELLE API UNIFIÉE : utiliser get_entity_pixel_pos du World
+        pixel_x, pixel_y = self.world_manager.get_entity_pixel_pos(pion.combat_tile_x, pion.combat_tile_y)
 
         # 3. Dessiner le sprite sur la surface
         surface.blit(sprite, (pixel_x, pixel_y))

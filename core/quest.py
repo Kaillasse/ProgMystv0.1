@@ -12,9 +12,9 @@ class Quest:
         return f"<Quest {self.code}: {self.nom} (+{self.score})>"
 
 QUESTS = [
-    Quest('#Q1', 'Variables simples', "Utiliser au moins 2 variables (entier, réel ou chaîne)"),
-    Quest('#Q2', 'Affectation', "Affecter une valeur à une variable avec ="),
-    Quest('#Q3', 'Affichage', "Utiliser print() pour afficher un message ou un résultat"),
+    Quest('#Q1', 'Affichage', "Utiliser print() pour afficher un message ou un résultat"),
+    Quest('#Q2', 'Variables simples', "Utiliser au moins 2 variables (entier, réel ou chaîne)"),
+    Quest('#Q3', 'Affectation', "Affecter une valeur à une variable avec ="),
     Quest('#Q4', 'Lecture utilisateur', "Utiliser input() pour récupérer une valeur"),
     Quest('#Q5', 'Condition simple', "Utiliser une instruction if"),
     Quest('#Q6', 'Condition double', "Utiliser if ... else"),
@@ -26,7 +26,7 @@ QUESTS = [
     Quest('#Q12', 'Structure claire', "Diviser le code en parties lisibles, nommer les variables clairement"),
     Quest('#Q13', 'Erreurs gérées', "Ajouter une gestion d’erreur simple avec try/except"),
     Quest('#Q14', 'Problème quotidien', "Résoudre un petit problème inspiré de la vie courante (recette, monnaie, météo...)"),
-    Quest('#Q15', "Inspiration d'une autre matière", "Faire un programme utile en physique-chimie ou enseignement pro"),
+    Quest('#Q15', "Inspiration d'une autre matière", "Faire un prototype de programme utile en physique-chimie ou enseignement pro"),
     Quest('#Q16', 'Liste simple', "Créer une liste manuellement (ex : noms = ['A', 'B'])"),
     Quest('#Q17', "Ajout d'éléments", "Ajouter un élément avec .append()"),
     Quest('#Q18', "Suppression d’élément", "Supprimer un élément avec del, .remove() ou pop()"),
@@ -42,7 +42,6 @@ QUESTS = [
     Quest('#Q28', 'Variables booléennes', "Utiliser une variable de type bool"),
     Quest('#Q29', 'Calcul avec plusieurs variables', "Faire un calcul qui combine plusieurs types de données"),
     Quest('#Q30', 'Interface simple', "Ajouter une interaction avec une bibliothèque (tkinter, turtle ou autre)"),
-    Quest('#Q31', 'Initiative libre', "Ajouter une amélioration ou une originalité non demandée"),
 ]
 
 # Quêtes secondaires (utilitaires, bonnes pratiques, outils du quotidien)

@@ -2,19 +2,18 @@ import pygame
 import os
 from core.settings import get_grimoire_path
 from core.analyze import analyser_script
+from game.entity import Entity
 
-class JSON:
-    def __init__(self, name="JSON", sprite_path="assets/pnj/JSON/json_sprite.png", bust_path="assets/pnj/JSON/json_bust.png",
-                 start_tile=(3, 6)):
-        self.name = name
+class JSON(Entity):
+    def __init__(self, name="JSON", sprite_path="assets/pnj/JSON/json_sprite.png",
+                 bust_path="assets/pnj/JSON/json_bust.png", tile_pos=(3, 6)):
+        super().__init__(tile_pos, name)
         self.sprite_path = sprite_path
         self.bust_path = bust_path
-        self.map_name = "clairiere"
-        self.start_tile = start_tile
-        self.tile_pos = list(self.start_tile)
         self.quest_progress_key = "json_progress"
         self.dialog_state = 0
         self.has_given_quests = False
+        self.tile_pos = tile_pos
         self.sprite = self._load_image(self.sprite_path)
         self.bust = self._load_image(self.bust_path)
         
