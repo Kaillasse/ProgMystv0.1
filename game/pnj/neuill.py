@@ -5,11 +5,14 @@ from core.analyze import analyser_script
 from game.entity import Entity
 
 class Neuill(Entity):
-    def __init__(self, tile_pos, name="Neuill", sprite_path="assets/pnj/neuil/critter_badger_SW_idle.png", 
+    def __init__(self, grid_pos, name="Neuill", sprite_path="assets/pnj/neuil/critter_badger_SW_idle.png", 
                  bust_path="assets/pnj/neuil/neuil_bust.png"):
         
-        # Initialisation de la classe Entity
-        super().__init__(tile_pos, name)
+        # UNIFIED: Initialize with grid coordinates
+        super().__init__(grid_pos, name)
+        
+        # UNIFIED: Set movement type for NPCs (tile-based with smooth animations)
+        self.movement_type = "tile_based"
         
         # Attributs spécifiques à Neuill
         self.sprite_path = sprite_path
@@ -68,6 +71,18 @@ class Neuill(Entity):
             "idle": list(range(self.total_frames))  # Utilise toutes les frames pour l'animation idle
         }
     
+    def update(self, dt):
+        """UNIFIED: Update NPC with movement and animation"""
+        # Update movement animation (from Entity base class)
+        self.update_movement(dt)
+        
+        # Update sprite animation
+        self.update_animation(dt)
+    
+    def update_movement(self, dt):
+        """Met à jour le mouvement du PNJ"""
+        pass
+
     def update_animation(self, dt):
         """Met à jour l'animation du PNJ"""
         self.frame_timer += dt

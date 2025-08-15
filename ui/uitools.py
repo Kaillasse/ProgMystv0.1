@@ -273,9 +273,25 @@ class UISlider:
         return False
 
 class BorderManager:
-    """Gestionnaire des bordures découpées depuis l'asset allborder.png avec support 9-slicing"""
+    """Gestionnaire singleton des bordures découpées depuis l'asset allborder.png avec support 9-slicing"""
+    
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls, border_asset_path="assets/ui/allborder.png", session=None):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
     
     def __init__(self, border_asset_path="assets/ui/allborder.png", session=None):
+        # Évite la réinitialisation si déjà initialisé
+        if self._initialized:
+            # Met à jour la session si une nouvelle est fournie
+            if session and session != self.session:
+                self.session = session
+                self.load_border_index_from_session()
+            return
+            
         self.border_asset_path = border_asset_path
         self.borders = []
         self.current_border_index = 0
@@ -289,6 +305,27 @@ class BorderManager:
         
         self.load_borders()
         self.load_border_index_from_session()
+        
+        BorderManager._initialized = True
+    
+    @classmethod
+    def get_instance(cls, session=None):
+        """Obtient l'instance singleton du BorderManager avec session automatique"""
+        if session is None:
+            # Essaie d'obtenir la session actuelle automatiquement
+            try:
+                from core.session import SessionManager
+                session = SessionManager.get_current_session()
+            except:
+                pass
+        
+        return cls(session=session)
+    
+    @classmethod
+    def reset(cls):
+        """Remet à zéro l'instance (pour debug/tests)"""
+        cls._instance = None
+        cls._initialized = False
         
     def load_borders(self):
         """Découpe l'asset en 80 bordures individuelles"""
@@ -390,9 +427,18 @@ class BorderManager:
         self.save_border_index_to_session()
     
     def load_border_index_from_session(self):
-        """Charge l'index de bordure depuis la session"""
+        """Charge l'index de bordure depuis la session (automatique si pas de session)"""
+        # Essaie d'obtenir la session actuelle si pas de session fournie
         if not self.session:
-            print("[BORDER] Aucune session disponible pour charger l'index de bordure")
+            try:
+                from core.session import SessionManager
+                self.session = SessionManager.get_current_session()
+            except:
+                pass
+        
+        if not self.session:
+            print("[BORDER] Aucune session disponible, utilisation index par défaut")
+            self.current_border_index = 0
             return
         
         try:
@@ -411,7 +457,15 @@ class BorderManager:
             self.current_border_index = 0
     
     def save_border_index_to_session(self):
-        """Sauvegarde l'index de bordure dans la session"""
+        """Sauvegarde l'index de bordure dans la session (automatique si pas de session)"""
+        # Essaie d'obtenir la session actuelle si pas de session fournie
+        if not self.session:
+            try:
+                from core.session import SessionManager
+                self.session = SessionManager.get_current_session()
+            except:
+                pass
+        
         if not self.session:
             print("[BORDER] Aucune session disponible pour sauvegarder l'index de bordure")
             return
@@ -458,3 +512,280 @@ class BorderManager:
             screen.blit(pygame.transform.scale(border_data['right'], (corner, center_height)), (rect.x + rect.width - corner, rect.y + corner))
         if center_width > 0 and center_height > 0:
             screen.blit(pygame.transform.scale(border_data['center'], (center_width, center_height)), (rect.x + corner, rect.y + corner))
+
+# === Classe QuestStar pour les animations de quêtes ===
+class QuestStar:
+    """Animation d'étoiles de quêtes avec différents états"""
+    
+    QUEST_TYPES = {
+        'uncompleted': 'assets/other/Uncompletedquest.png',
+        'quest': 'assets/other/questStar.png',
+        'newquest': 'assets/other/queststar2.png',  # Fallback vers queststar2
+        'secretquest': 'assets/other/secretstar.png'
+    }
+    
+    def __init__(self, x, y, quest_type='uncompleted'):
+        self.x = x
+        self.y = y
+        self.quest_type = quest_type
+        self.frames = []
+        self.current_frame = 0
+        self.frame_timer = 0
+        self.frame_delay = 100  # ms entre les frames
+        self.load_frames()
+    
+    def load_frames(self):
+        """Charge les 13 frames d'animation depuis une image 416x32"""
+        sprite_path = self.QUEST_TYPES.get(self.quest_type, self.QUEST_TYPES['uncompleted'])
+        
+        try:
+            # Tente de charger l'image
+            if os.path.exists(sprite_path):
+                sheet = pygame.image.load(sprite_path).convert_alpha()
+                # Vérifie les dimensions (416x32 pour 13 frames de 32x32)
+                if sheet.get_width() >= 416 and sheet.get_height() >= 32:
+                    frame_width = 32
+                    for i in range(13):
+                        x = i * frame_width
+                        frame_rect = pygame.Rect(x, 0, frame_width, 32)
+                        if x + frame_width <= sheet.get_width():
+                            frame = sheet.subsurface(frame_rect).copy()
+                            self.frames.append(frame)
+                else:
+                    # Image trop petite, utilise l'image entière
+                    self.frames = [sheet]
+            else:
+                # Fichier non trouvé, utilise un fallback
+                self.create_fallback_frames()
+                
+        except (pygame.error, FileNotFoundError):
+            self.create_fallback_frames()
+        
+        if not self.frames:
+            self.create_fallback_frames()
+    
+    def create_fallback_frames(self):
+        """Crée des frames de secours si l'asset n'est pas trouvé"""
+        # Couleurs selon le type de quête
+        colors = {
+            'uncompleted': (100, 100, 100),
+            'quest': (255, 255, 0),
+            'newquest': (0, 255, 255),
+            'secretquest': (255, 0, 255)
+        }
+        
+        color = colors.get(self.quest_type, (255, 255, 255))
+        
+        # Crée 13 frames avec différentes intensités pour simuler l'animation
+        for i in range(13):
+            frame = pygame.Surface((32, 32), pygame.SRCALPHA)
+            intensity = 0.5 + 0.5 * abs(math.sin(i * math.pi / 6))
+            r, g, b = color
+            animated_color = (int(r * intensity), int(g * intensity), int(b * intensity))
+            
+            # Dessine une étoile simple
+            center = (16, 16)
+            points = []
+            for j in range(10):  # 5 pointes d'étoile
+                angle = j * math.pi / 5
+                radius = 12 if j % 2 == 0 else 6
+                x = center[0] + radius * math.cos(angle - math.pi / 2)
+                y = center[1] + radius * math.sin(angle - math.pi / 2)
+                points.append((x, y))
+            
+            pygame.draw.polygon(frame, animated_color, points)
+            self.frames.append(frame)
+    
+    def update(self, dt):
+        """Met à jour l'animation"""
+        if len(self.frames) <= 1:
+            return
+            
+        self.frame_timer += dt
+        if self.frame_timer >= self.frame_delay:
+            self.frame_timer = 0
+            self.current_frame = (self.current_frame + 1) % len(self.frames)
+    
+    def draw(self, screen):
+        """Dessine la frame actuelle"""
+        if self.frames:
+            frame = self.frames[self.current_frame]
+            screen.blit(frame, (self.x, self.y))
+    
+    def set_position(self, x, y):
+        """Change la position de l'animation"""
+        self.x = x
+        self.y = y
+    
+    def get_rect(self):
+        """Retourne le rectangle de collision"""
+        return pygame.Rect(self.x, self.y, 32, 32)
+
+# === Classe QuestButton pour le bouton glissable de quêtes ===
+class QuestButton:
+    """Bouton glissable pour ouvrir la table des quêtes"""
+    
+    def __init__(self, x, y, screen_height):
+        self.base_x = x
+        self.base_y = y
+        self.x = x
+        self.y = y
+        self.screen_height = screen_height
+        
+        # États du bouton
+        self.is_dragging = False
+        self.is_hovered = False
+        self.drag_start_y = 0
+        self.button_height = 60  # Hauteur du bouton visible
+        self.drag_threshold = 50  # Distance à glisser pour déclencher
+        
+        # Animation
+        self.slide_offset = 0
+        self.slide_speed = 5
+        self.slide_target = 0
+        
+        # Sprites (nous utiliserons les bordures existantes)
+        self.border_manager = None
+        self.load_border_sprite()
+        
+    def load_border_sprite(self):
+        """Charge le sprite de bordure pour le bouton"""
+        try:
+            # Utilise le système de bordures existant (singleton)
+            self.border_manager = BorderManager.get_instance()
+        except:
+            self.border_manager = None
+    
+    def set_position(self, x, y):
+        """Met à jour la position de base du bouton"""
+        self.base_x = x
+        self.base_y = y
+        self.x = x
+        self.y = y
+    
+    def get_visible_rect(self):
+        """Retourne le rectangle visible du bouton (coins du haut seulement)"""
+        visible_height = 20  # Seuls les coins du haut sont visibles
+        return pygame.Rect(self.x, self.y - visible_height, 100, visible_height)
+    
+    def get_full_rect(self):
+        """Retourne le rectangle complet du bouton pour la détection"""
+        return pygame.Rect(self.x, self.y - self.button_height, 100, self.button_height)
+    
+    def handle_event(self, event):
+        """Gère les événements du bouton glissable"""
+        mouse_pos = pygame.mouse.get_pos()
+        full_rect = self.get_full_rect()
+        
+        # Détection hover
+        self.is_hovered = full_rect.collidepoint(mouse_pos)
+        
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if full_rect.collidepoint(mouse_pos):
+                self.is_dragging = True
+                self.drag_start_y = mouse_pos[1]
+                return "drag_start"
+        
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self.is_dragging:
+                self.is_dragging = False
+                
+                # Vérifie si on a glissé suffisamment vers le haut
+                drag_distance = self.drag_start_y - mouse_pos[1]
+                if drag_distance > self.drag_threshold:
+                    return "quest_table_open"
+                else:
+                    # Remet le bouton en place
+                    self.slide_target = 0
+                    return "drag_cancel"
+        
+        elif event.type == pygame.MOUSEMOTION and self.is_dragging:
+            # Calcule le décalage de glissement
+            drag_distance = self.drag_start_y - mouse_pos[1]
+            self.slide_offset = max(0, min(drag_distance, self.screen_height))
+            
+            # Si on a glissé suffisamment, commence l'animation
+            if drag_distance > self.drag_threshold:
+                self.slide_target = self.screen_height
+                return "quest_table_prepare"
+        
+        return None
+    
+    def update(self):
+        """Met à jour l'animation du bouton"""
+        # Animation de glissement
+        if abs(self.slide_offset - self.slide_target) > 1:
+            if self.slide_offset < self.slide_target:
+                self.slide_offset += self.slide_speed
+            else:
+                self.slide_offset -= self.slide_speed
+        else:
+            self.slide_offset = self.slide_target
+        
+        # Met à jour la position
+        self.y = self.base_y - self.slide_offset
+    
+    def draw(self, screen):
+        """Dessine le bouton avec les coins de bordure visibles"""
+        # Rectangle visible (coins du haut)
+        visible_rect = self.get_visible_rect()
+        
+        # Couleur de fond selon l'état
+        if self.is_dragging:
+            bg_color = (100, 150, 200)
+        elif self.is_hovered:
+            bg_color = (80, 120, 160)
+        else:
+            bg_color = (60, 100, 140)
+        
+        # Fond du bouton
+        pygame.draw.rect(screen, bg_color, visible_rect)
+        
+        # Bordure avec le border manager si disponible
+        if self.border_manager:
+            self.border_manager.draw_border(screen, visible_rect, border_thickness=3)
+        else:
+            # Bordure simple
+            pygame.draw.rect(screen, (150, 150, 200), visible_rect, 2)
+        
+        # Icône de quête (étoile simple ou texte)
+        self._draw_quest_icon(screen, visible_rect)
+        
+        # Indicateur de glissement si en train de glisser
+        if self.is_dragging and self.slide_offset > 10:
+            self._draw_drag_indicator(screen)
+    
+    def _draw_quest_icon(self, screen, rect):
+        """Dessine l'icône de quête sur le bouton"""
+        # Texte simple pour l'instant
+        font = pygame.font.Font(None, 16)
+        text = "Quêtes"
+        text_surface = font.render(text, True, (255, 255, 255))
+        text_rect = text_surface.get_rect(center=rect.center)
+        screen.blit(text_surface, text_rect)
+    
+    def _draw_drag_indicator(self, screen):
+        """Dessine un indicateur de progression du glissement"""
+        # Barre de progression sur le côté
+        progress = min(1.0, self.slide_offset / self.drag_threshold)
+        bar_height = int(100 * progress)
+        
+        bar_rect = pygame.Rect(10, self.screen_height - 120, 5, bar_height)
+        pygame.draw.rect(screen, (255, 255, 100), bar_rect)
+        
+        # Texte d'indication
+        if progress >= 1.0:
+            font = pygame.font.Font(None, 24)
+            text = "Relâchez pour ouvrir"
+            text_surface = font.render(text, True, (255, 255, 100))
+            text_rect = text_surface.get_rect()
+            text_rect.centerx = screen.get_width() // 2
+            text_rect.centery = self.screen_height - 50
+            screen.blit(text_surface, text_rect)
+    
+    def reset_position(self):
+        """Remet le bouton à sa position de base"""
+        self.slide_offset = 0
+        self.slide_target = 0
+        self.is_dragging = False
+        self.y = self.base_y

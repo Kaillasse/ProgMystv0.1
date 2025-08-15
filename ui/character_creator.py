@@ -48,7 +48,7 @@ class CharacterCreator:
         self.filter_surface.set_alpha(128)  # Opacité 0.5
 
         # Interface avec les nouveaux boutons et sliders
-        self.border_mgr = BorderManager(session=session)
+        self.border_mgr = BorderManager.get_instance(session)
 
         # Slider vertical pour les catégories (centré entre cadre et colonne)
         slider_x = (500 + 200) // 2  # Centré entre colonne (200px) et cadre buste (500px)
@@ -94,15 +94,26 @@ class CharacterCreator:
             with open(self.data_path, "r", encoding="utf-8") as f:
                 self.player_data = json.load(f)
             for cat in CATEGORIES:
-                bust = self.player_data.get("buste", {}).get(cat, {})
-                self.indices[cat] = bust.get("index", 0)
-                self.colors[cat] = bust.get("color")
+                # Support des deux formats : "bust" (nouveau) et "buste" (ancien)
+                bust_data = self.player_data.get("bust", {}).get(cat, {})
+                if not bust_data:  # Fallback vers l'ancien format
+                    bust_data = self.player_data.get("buste", {}).get(cat, {})
+                self.indices[cat] = bust_data.get("index", 0)
+                self.colors[cat] = bust_data.get("color")
                 if self.colors[cat]:
                     self.apply_color_pil(cat, tuple(self.colors[cat]))
             for cat in SPRITE_CATEGORIES:
                 sprite = self.player_data.get("sprite", {}).get(cat, {})
                 self.sprite_indices[cat] = sprite.get("index", 0)
                 self.sprite_colors[cat] = sprite.get("color")
+                
+            # Charger l'index de bordure
+            border_data = self.player_data.get("border", {})
+            if isinstance(border_data, dict):
+                border_index = border_data.get("current_index", 0)
+            else:
+                border_index = border_data  # Ancien format (juste un nombre)
+            self.border_mgr.set_border_index(border_index)
 
     def load_assets(self):
         """Charge les assets PIL et pygame pour chaque catégorie."""
@@ -369,19 +380,40 @@ class CharacterCreator:
     def export_preview(self):
         """Exporte le personnage avec la nouvelle configuration"""
         try:
-            # Dimensions basées sur les assets existants
-            width = 128  # Taille standard pour les assets
-            height = 192
+            # Vérification que les assets sont bien chargés
+            if not any(self.assets.values()):
+                print("[ERREUR] Aucun asset chargé pour l'export")
+                return
+
+            # Dimensions basées sur les premiers assets trouvés
+            first_asset = None
+            for cat in CATEGORIES:
+                if self.assets[cat] and self.indices[cat] < len(self.assets[cat]):
+                    first_asset = self.assets[cat][self.indices[cat]]
+                    break
+            
+            if first_asset is None:
+                print("[ERREUR] Aucun asset valide trouvé")
+                return
+                
+            width = first_asset.get_width()
+            height = first_asset.get_height()
             composite = pygame.Surface((width, height), pygame.SRCALPHA)
+            composite.fill((0, 0, 0, 0))  # Transparent background
 
-            # Configuration complète
-            config = self.get_current_config()
+            print(f"[EXPORT] Composition du bust ({width}x{height})")
 
-            # Composition du bust pour l'export PNG
+            # Composition du bust dans le même ordre que l'affichage
+            layers_drawn = 0
             for cat in CATEGORIES:
                 if self.assets[cat] and self.indices[cat] < len(self.assets[cat]):
                     sprite = self.assets[cat][self.indices[cat]]
-                    composite.blit(sprite, (0, 0))
+                    if sprite:
+                        composite.blit(sprite, (0, 0))
+                        layers_drawn += 1
+                        print(f"[EXPORT] Layer {cat}: index {self.indices[cat]} ajouté")
+
+            print(f"[EXPORT] {layers_drawn} layers composés")
 
             # Sauvegarde des images
             os.makedirs("data", exist_ok=True)
@@ -389,22 +421,32 @@ class CharacterCreator:
             pygame.image.save(composite, image_path)
             print(f"[OK] Personnage exporté : {image_path}")
 
-            # Sauvegarde des données JSON
-            self.player_data["buste"] = {cat: {"index": self.indices[cat], "color": self.colors[cat]} 
-                                        for cat in CATEGORIES if self.colors[cat] or self.indices[cat]}
+            # Sauvegarde des données JSON (correction: "bust" au lieu de "buste")
+            self.player_data["bust"] = {cat: {"index": self.indices[cat], "color": self.colors[cat]} 
+                                       for cat in CATEGORIES if self.colors[cat] or self.indices[cat] > 0}
             self.player_data["sprite"] = {cat: {"index": self.sprite_indices[cat], "color": self.sprite_colors[cat]} 
-                                         for cat in SPRITE_CATEGORIES if self.sprite_colors[cat] or self.sprite_indices[cat]}
-            # Sauvegarde aussi l'index de bordure choisi
-            self.player_data["border"] = self.border_mgr.current_border_index
+                                         for cat in SPRITE_CATEGORIES if self.sprite_colors[cat] or self.sprite_indices[cat] > 0}
+            
+            # Sauvegarde de la bordure dans session.py
+            self.player_data["border"] = {"current_index": self.border_mgr.current_border_index}
+            
+            # Mise à jour de la session pour la bordure
+            if hasattr(self.session, 'data'):
+                self.session.data["border"] = {"current_index": self.border_mgr.current_border_index}
+                self.session.save_data()
+            
             with open(self.data_path, "w", encoding="utf-8") as f:
                 json.dump(self.player_data, f, indent=4)
             print(f"[OK] Fichier mis à jour : {self.data_path}")
 
-            # Création du sprite isométrique final
+            # Configuration complète pour le sprite iso
+            config = self.get_current_config()
             create_iso_sprite(config, output_path=os.path.join("data", f"{self.player_name}_iso.png"))
             
         except Exception as e:
             print(f"[ERREUR] Export : {e}")
+            import traceback
+            traceback.print_exc()
 
     def run(self):
         """Boucle principale avec la nouvelle interface"""

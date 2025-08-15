@@ -1,285 +1,385 @@
-import pygame
 import json
+import pygame
 import os
-from core.settings import TILE_WIDTH, TILE_HEIGHT, grid_to_iso, iso_to_grid
+from core.settings import *
 
 class World:
-
-    LAYER_Z_OFFSET = 16
-    def __init__(self, screen=None):
-        self.tile_folder = os.path.join("assets", "tiles")
-        self.screen = screen or pygame.display.get_surface()
-        self.tile_images = []
-        # Nouvelle structure centralisée : liste de tuples (entité ou classe, (x, y))
-        self.spawn_point = {
-            "joueur": (0, 0),
-            "DameIndenta": (4, 8),
-            "Neuill": (1, 6),
-            "JSON": (3, 6),
-            "Loopfang": (1, 8),
+    """Simple isometric world with clean coordinate system"""
+    
+    def __init__(self, screen):
+        self.screen = screen
+        self.screen_center_x = screen.get_width() // 2
+        self.screen_center_y = screen.get_height() // 2
+        
+        # Simple entity system
+        self.entities = []
+        
+        # Spawn points using REAL tile coordinates (0-32)
+        # Based on visual observation from screenshot
+        self.spawn_points = {
+            "joueur": (16, 16),         # Center of 33x33 map (correct)
+            "DameIndenta": (10, 20),    # Lower left area (south-west of center)
+            "Neuill": (16, 10),         # North of center (as seen in screenshot)
+            "JSON": (10, 16),           # West of center  
+            "Loopfang": (22, 16),       # East of center
         }
-        self._tiles_cache = None
-        self.screen_center_x = 400
-        self.screen_center_y = 200
-        self.bg_img = None
-        self.cloud_imgs = []
-        self.cloud_pos = []
-        self.cloud_speed = [0.3, -0.2]
-        self.load()
-        self._init_background()
-
-    def load(self):
-        """Charge la map et les tuiles"""
-        self._load_tiles()
-        self._load_map_from_json()
-
-    def _load_map_from_json(self):
-        """Charge la map depuis data/map/clairiere.json ou crée une grille par défaut"""
-        map_path = "data/map/clairiere.json"
-        try:
-            if not os.path.exists(map_path):
-                print(f"[WORLD] Fichier map '{map_path}' introuvable, création d'une grille par défaut")
-                self._create_default_grid()
-                return
-            with open(map_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            print(f"[WORLD] Chargement de la map depuis {map_path}")
-            tiles = []
-            for layer_count, layer in enumerate([l for l in data.get("layers", []) if l.get("type") == "tilelayer"]):
-                width, height = layer.get("width", 0), layer.get("height", 0)
-                layer_data = layer.get("data", [])
-                print(f"[WORLD] Layer {layer_count}: {width}x{height}, {len(layer_data)} tuiles")
-                for y in range(height):
-                    for x in range(width):
-                        idx = y * width + x
-                        if idx < len(layer_data):
-                            tile_id = layer_data[idx]
-                            if tile_id > 0:
-                                world_x = x - (width // 2) + self.spawn_point["joueur"][0]
-                                world_y = y - (height // 2) + self.spawn_point["joueur"][1]
-                                tiles.append({
-                                    "x": world_x,
-                                    "y": world_y,
-                                    "z": layer_count,
-                                    "tile_id": tile_id,
-                                    "is_walkable": self._is_walkable_tile(tile_id)
-                                })
-            self._tiles_cache = tiles
-            print(f"[WORLD] Map 'clairiere' chargée: {len(tiles)} tuiles, {layer_count+1} layers")
-        except Exception as e:
-            print(f"[WORLD] Erreur chargement map clairiere: {e}")
-            self._create_default_grid()
-
-    def _load_tiles(self):
-        """Charge les images de tuiles depuis assets/tiles/"""
+        
+        # Reference walkable layer (layer_1 = index 2)
+        self.walkable_layer_index = 2
+        
+        # Tile system
         self.tile_images = []
+        self.tile_grid = {}  # grid_pos -> tile_data
+        
+        # Load everything
+        self.load_tiles()
+        self.load_map()
+        self.validate_spawn_points()
+        
+    def load_tiles(self):
+        """Load tile images from assets/tiles/"""
+        self.tile_images = []
+        tiles_dir = "assets/tiles"
+        
         try:
-            if not os.path.isdir(self.tile_folder):
-                print(f"[WORLD] Dossier tuiles '{self.tile_folder}' introuvable")
-                self._create_default_tiles()
-                return
-            tile_files = [f for f in sorted(os.listdir(self.tile_folder)) if f.endswith(".png") and f.startswith("tile_")]
-            if not tile_files:
-                print("[WORLD] Aucune tuile trouvée dans assets/tiles/")
-                self._create_default_tiles()
-                return
-            for filename in tile_files:
-                path = os.path.join(self.tile_folder, filename)
-                img = pygame.image.load(path).convert_alpha()
-                img = pygame.transform.scale(img, (TILE_WIDTH, TILE_HEIGHT))
-                self.tile_images.append(img)
-            print(f"[WORLD] {len(self.tile_images)} tuiles chargées depuis {self.tile_folder}")
-        except Exception as e:
-            print(f"[WORLD] Erreur chargement tuiles: {e}")
-            self._create_default_tiles()
-
-    def _is_walkable_tile(self, tile_id):
-        """Détermine si une tuile est walkable"""
-        return tile_id > 0 and tile_id not in {91, 92, 93, 94, 95, 101, 102, 103, 104}
-
-    def _init_background(self):
-        """Initialise l'arrière-plan avec nuages"""
-        try:
-            self.bg_img = pygame.image.load("assets/cloud/1.png").convert()
-            screen_size = self.screen.get_size()
-            self.bg_img = pygame.transform.scale(self.bg_img, screen_size)
-            self.cloud_imgs = [pygame.image.load(f"assets/cloud/{i}.png").convert_alpha() for i in (2, 3)]
-            self.cloud_pos = [
-                [-self.cloud_imgs[0].get_width(), screen_size[1] - self.cloud_imgs[0].get_height() - 50],
-                [screen_size[0], screen_size[1] - self.cloud_imgs[1].get_height() - 120]
-            ]
-        except Exception:
-            print("[WORLD] Impossible de charger les images de nuages")
-            screen_size = self.screen.get_size() if self.screen else (800, 600)
-            self.bg_img = pygame.Surface(screen_size)
-            self.bg_img.fill((135, 206, 235))
-            self.cloud_imgs = []
-            self.cloud_pos = []
-
-    def update_background(self, screen):
-        """Met à jour l'arrière-plan animé"""
-        if self.bg_img:
-            screen.blit(self.bg_img, (0, 0))
-        
-        if self.cloud_imgs:
-            screen_width = screen.get_width()
-            for i, cloud in enumerate(self.cloud_imgs):
-                self.cloud_pos[i][0] += self.cloud_speed[i]
-                if self.cloud_speed[i] > 0:
-                    if self.cloud_pos[i][0] > screen_width:
-                        self.cloud_pos[i][0] = -cloud.get_width()
-                else:
-                    if self.cloud_pos[i][0] < -cloud.get_width():
-                        self.cloud_pos[i][0] = screen_width
-                screen.blit(cloud, (int(self.cloud_pos[i][0]), int(self.cloud_pos[i][1])))
-
-    def get_grid_position(self, entity):
-        """MÉTHODE UNIFIÉE : Position entière standardisée pour toutes les entités"""
-        if hasattr(entity, 'tile_pos'):
-            return (int(round(entity.tile_pos[0])), int(round(entity.tile_pos[1])))
-        return (0, 0)
-    
-    def tile_to_pixel(self, tile_x, tile_y):
-        """Convertit coordonnées tuile vers pixel isométrique"""
-        iso_x, iso_y = grid_to_iso(tile_x, tile_y, TILE_WIDTH, TILE_HEIGHT)
-        return iso_x + self.screen_center_x, iso_y + self.screen_center_y
-    
-    def pixel_to_tile(self, pixel_x, pixel_y):
-        """Convertit pixel vers coordonnées tuile"""
-        iso_x = pixel_x - self.screen_center_x
-        iso_y = pixel_y - self.screen_center_y
-        return iso_to_grid(iso_x, iso_y, TILE_WIDTH, TILE_HEIGHT)
-
-    def draw(self, screen, camera_offset=(0, 0)):
-        """Dessine le monde complet"""
-        self.update_background(screen)
-        
-        all_tiles = self.get_all_tiles_with_pos()
-        if not all_tiles:
-            return
-            
-        if not self.tile_images:
-            return
-        
-        # Calculer la tuile sous la souris
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        world_mouse_x = mouse_x - camera_offset[0]
-        world_mouse_y = mouse_y - camera_offset[1]
-        hovered_tile_x, hovered_tile_y = self.pixel_to_tile(world_mouse_x, world_mouse_y)
-        
-        # Trier les tuiles pour un rendu correct (layer par layer)
-        sorted_tiles = sorted(all_tiles, key=lambda t: (t["z"], t["y"], t["x"]))
-
-        # Rendu des tuiles avec offset z
-        for tile in sorted_tiles:
-            tile_id = tile["tile_id"]
-            x, y, z = tile["x"], tile["y"], tile["z"]
-
-            # Image de la tuile
-            tile_img_idx = tile_id - 1
-            if 0 <= tile_img_idx < len(self.tile_images):
-                tile_img = self.tile_images[tile_img_idx]
-            else:
-                tile_img = pygame.Surface((TILE_WIDTH, TILE_HEIGHT))
-                tile_img.fill((100, 200, 100))
-
-            # Position d'affichage avec offset z
-            screen_x, screen_y = self.tile_to_pixel(x, y)
-            screen_x += camera_offset[0]
-            screen_y += camera_offset[1] - z * self.LAYER_Z_OFFSET
-
-            # Highlight de la tuile sous la souris
-            if x == hovered_tile_x and y == hovered_tile_y:
-                screen_y -= 8
-                highlight_surface = pygame.Surface((TILE_WIDTH, TILE_HEIGHT))
-                highlight_surface.set_alpha(100)
-                highlight_surface.fill((255, 255, 0))
-                screen.blit(highlight_surface, (screen_x, screen_y))
-
-            screen.blit(tile_img, (screen_x, screen_y))
-
-    def get_all_tiles_with_pos(self):
-        """Retourne toutes les tuiles avec leurs positions"""
-        if self._tiles_cache is None:
-            self._load_map_from_json()
-        return self._tiles_cache
-
-    def get_tiles_at_position(self, x, y):
-        """Retourne les tuiles à la position donnée"""
-        grid_x, grid_y = round(x), round(y)
-        return [t for t in self.get_all_tiles_with_pos() 
-                if t["x"] == grid_x and t["y"] == grid_y]
-
-    def get_spawn_position(self, entity_name="joueur"):
-        pos = self.spawn_point.get(entity_name)
-        if pos and self.is_valid_tile_position(pos[0], pos[1]):
-            return pos
-        raise ValueError(f"Spawn point not found for entity: {entity_name}")
-
-    def get_spawn_layer(self):
-        """Retourne le layer de spawn (toujours 0 maintenant)"""
-        return 2
-
-    def get_tile_images(self):
-        """Retourne les images de tuiles"""
-        return self.tile_images
-    
-    def is_valid_tile_position(self, x, y):
-        """Vérifie qu'une position correspond à une tuile valide dans le cache"""
-        return any(t["x"] == x and t["y"] == y for t in self.get_all_tiles_with_pos())
-    
-    # === MÉTHODES UNIFIÉES POUR LES ENTITÉS ===
-    
-    def get_entity_pixel_pos(self, tile_x, tile_y, camera_offset=(0, 0)):
-        """UNIQUE MÉTHODE de conversion tuile→pixel pour TOUTES les entités"""
-        pixel_x, pixel_y = self.tile_to_pixel(tile_x, tile_y)
-        return pixel_x + camera_offset[0], pixel_y + camera_offset[1]
-    
-    def sync_combat_positions(self, entities):
-        """Synchronise les positions de combat avec les positions monde pour toutes les entités"""
-        for entity in entities:
-            if hasattr(entity, 'tile_pos') and hasattr(entity, 'combat_tile_x'):
-                grid_x, grid_y = self.get_grid_position(entity)
-                entity.combat_tile_x = grid_x
-                entity.combat_tile_y = grid_y
-                print(f"[WORLD] Sync combat: {getattr(entity, 'name', 'Entity')} -> combat({entity.combat_tile_x}, {entity.combat_tile_y})")
-    
-    def validate_entity_positions(self, entities):
-        """DEBUG : Valide et affiche les positions de toutes les entités"""
-        print("[WORLD] === VALIDATION DES POSITIONS ===")
-        for entity in entities:
-            name = getattr(entity, 'name', 'Unknown')
-            
-            if hasattr(entity, 'tile_pos'):
-                # Position grille standardisée
-                grid_x, grid_y = self.get_grid_position(entity)
-                # Position pixel calculée
-                pixel_x, pixel_y = self.get_entity_pixel_pos(entity.tile_pos[0], entity.tile_pos[1])
-                # Position combat
-                combat_pos = f"combat({getattr(entity, 'combat_tile_x', '?')}, {getattr(entity, 'combat_tile_y', '?')})"
+            if os.path.exists(tiles_dir):
+                tile_files = [f for f in sorted(os.listdir(tiles_dir)) 
+                             if f.endswith(".png") and f.startswith("tile_")]
                 
-                print(f"[WORLD] {name}: tile_pos({entity.tile_pos[0]:.2f}, {entity.tile_pos[1]:.2f}) | grid({grid_x}, {grid_y}) | {combat_pos} | pixel({pixel_x:.1f}, {pixel_y:.1f})")
+                for filename in tile_files:
+                    path = os.path.join(tiles_dir, filename)
+                    img = pygame.image.load(path).convert_alpha()
+                    img = pygame.transform.scale(img, (TILE_WIDTH, TILE_HEIGHT))
+                    self.tile_images.append(img)
+                
+                print(f"[WORLD] Loaded {len(self.tile_images)} tile images")
             else:
-                print(f"[WORLD] {name}: NO tile_pos!")
-        print("[WORLD] === FIN VALIDATION ===")
+                print("[WORLD] Tiles directory not found, using fallback")
+                self._create_fallback_tile()
+                
+        except Exception as e:
+            print(f"[WORLD] Error loading tiles: {e}")
+            self._create_fallback_tile()
+    
+    def _create_fallback_tile(self):
+        """Create simple fallback tile"""
+        fallback = pygame.Surface((TILE_WIDTH, TILE_HEIGHT), pygame.SRCALPHA)
         
-    # === MÉTHODES MANQUANTES (fallback) ===
+        # Draw diamond shape
+        points = [
+            (TILE_WIDTH//2, 0),           # Top
+            (TILE_WIDTH, TILE_HEIGHT//2), # Right
+            (TILE_WIDTH//2, TILE_HEIGHT), # Bottom
+            (0, TILE_HEIGHT//2)           # Left
+        ]
+        pygame.draw.polygon(fallback, (100, 150, 100), points)
+        pygame.draw.polygon(fallback, (80, 120, 80), points, 2)
+        
+        self.tile_images = [fallback]
+    
+    def load_map(self):
+        """Load map data and create isometric grid"""
+        map_path = "data/map/clairiere.json"
+        
+        try:
+            if os.path.exists(map_path):
+                with open(map_path, 'r', encoding='utf-8') as f:
+                    map_data = json.load(f)
+                
+                self._process_map_data(map_data)
+                print(f"[WORLD] Map loaded with {len(self.tile_grid)} tiles")
+            else:
+                print("[WORLD] Map file not found, creating default grid")
+                self._create_default_grid()
+                
+        except Exception as e:
+            print(f"[WORLD] Error loading map: {e}")
+            self._create_default_grid()
+    
+    def _process_map_data(self, map_data):
+        """Process JSON map data using REAL coordinates (0-32)"""
+        self.tile_grid = {}
+        self.walkable_grid = {}  # Simplified walkable reference from layer_1
+        
+        layers = [l for l in map_data.get("layers", []) if l.get("type") == "tilelayer"]
+        
+        for layer_index, layer in enumerate(layers):
+            width = layer.get("width", 0)
+            height = layer.get("height", 0)
+            data = layer.get("data", [])
+            
+            print(f"[WORLD] Processing layer {layer_index}: {width}x{height}")
+            
+            for y in range(height):
+                for x in range(width):
+                    idx = y * width + x
+                    if idx < len(data):
+                        tile_id = data[idx]
+                        
+                        # Use REAL coordinates (no centering)
+                        real_x, real_y = x, y
+                        
+                        # Store all layers
+                        if tile_id > 0:
+                            tile_key = (real_x, real_y, layer_index)
+                            self.tile_grid[tile_key] = {
+                                'tile_id': tile_id,
+                                'layer': layer_index
+                            }
+                        
+                        # Layer_1 (index 2) defines walkability
+                        if layer_index == self.walkable_layer_index:
+                            self.walkable_grid[(real_x, real_y)] = tile_id > 0
+                            
+                            # Store base walkable tiles for position checks
+                            if tile_id > 0:
+                                self.tile_grid[(real_x, real_y)] = {
+                                    'tile_id': tile_id,
+                                    'layer': layer_index,
+                                    'walkable': True
+                                }
     
     def _create_default_grid(self):
-        """Crée une grille par défaut si aucune map n'est trouvée"""
-        print("[WORLD] Création d'une grille par défaut 10x10")
-        tiles = []
-        for y in range(-5, 5):
-            for x in range(-5, 5):
-                tiles.append({
-                    "x": x, "y": y, "z": 0,
-                    "tile_id": 1, "is_walkable": True
-                })
-        self._tiles_cache = tiles
+        """Create simple default grid for testing"""
+        self.tile_grid = {}
+        for x in range(-10, 11):
+            for y in range(-10, 11):
+                self.tile_grid[(x, y)] = {
+                    'tile_id': 1,
+                    'walkable': True
+                }
     
-    def _create_default_tiles(self):
-        """Crée des tuiles par défaut si aucune image n'est trouvée"""
-        print("[WORLD] Création de tuiles par défaut")
-        default_tile = pygame.Surface((TILE_WIDTH, TILE_HEIGHT))
-        default_tile.fill((100, 200, 100))  # Vert
-        self.tile_images = [default_tile]
+    def _is_walkable(self, tile_id):
+        """Determine if tile is walkable - simple rules"""
+        # Most tiles are walkable except obvious obstacles
+        blocked_tiles = {91, 92, 93, 94, 95, 101, 102, 103, 104}  # Trees, rocks, etc
+        return tile_id not in blocked_tiles
+    
+    def validate_spawn_points(self):
+        """Ensure all spawn points are on walkable tiles"""
+        invalid_spawns = []
+        
+        for name, (x, y) in list(self.spawn_points.items()):
+            if not self.is_valid_position(x, y):
+                # Find nearest walkable tile
+                new_pos = self.find_nearest_walkable(x, y)
+                if new_pos:
+                    print(f"[WORLD] Moved spawn point {name} from ({x}, {y}) to {new_pos}")
+                    self.spawn_points[name] = new_pos
+                else:
+                    print(f"[WORLD] Error: Could not find walkable position for {name}")
+                    invalid_spawns.append(name)
+        
+        if invalid_spawns:
+            print(f"[WORLD] Warning: {len(invalid_spawns)} spawn points remain invalid: {invalid_spawns}")
+    
+    def find_nearest_walkable(self, x, y, max_distance=5):
+        """Find nearest walkable position using spiral search"""
+        # Start from distance 1 and spiral outward
+        for distance in range(1, max_distance + 1):
+            # Check all positions at this distance
+            for dx in range(-distance, distance + 1):
+                for dy in range(-distance, distance + 1):
+                    # Only check positions on the border of the current distance
+                    if abs(dx) == distance or abs(dy) == distance:
+                        test_x, test_y = int(x + dx), int(y + dy)
+                        if self.is_valid_position(test_x, test_y):
+                            return (test_x, test_y)
+        
+        print(f"[WORLD] No walkable position found near ({x}, {y}) within {max_distance} tiles")
+        return None
+    
+    def get_spawn_position(self, entity_name):
+        """Get reliable spawn position aligned with tile grid"""
+        spawn_pos = self.spawn_points.get(entity_name, (0, 0))
+        
+        # Debug: show which tile this corresponds to
+        print(f"[WORLD] {entity_name} spawn: grid {spawn_pos}")
+        
+        # Ensure spawn position is valid and walkable
+        if not self.is_valid_position(spawn_pos[0], spawn_pos[1]):
+            print(f"[WORLD] Warning: Spawn {spawn_pos} for {entity_name} not walkable")
+            
+            # Try to find a nearby walkable position
+            valid_pos = self.find_nearest_walkable(spawn_pos[0], spawn_pos[1])
+            if valid_pos:
+                print(f"[WORLD] Found walkable position {valid_pos} for {entity_name}")
+                return valid_pos
+            else:
+                print(f"[WORLD] Error: No walkable position found for {entity_name}, using default (0,0)")
+                return (0, 0)
+        
+        print(f"[WORLD] {entity_name} spawn validated: {spawn_pos}")
+        return spawn_pos
+    
+    def is_valid_position(self, x, y):
+        """Simple position validation using layer_1"""
+        # Convert to real grid coordinates (0-32)
+        grid_x = int(round(float(x)))
+        grid_y = int(round(float(y)))
+        
+        # Check bounds
+        if not (0 <= grid_x < 33 and 0 <= grid_y < 33):
+            return False
+        
+        # Check if walkable in layer_1
+        return self.walkable_grid.get((grid_x, grid_y), False)
+    
+    def get_screen_position(self, grid_x, grid_y, camera_offset=(0, 0)):
+        """Convert grid coordinates to screen position with unified axis correction"""
+        # Apply axis correction: transform to visual-consistent coordinates
+        # This matches Character's input logic: +X goes NW, +Y goes NE visually
+        corrected_x, corrected_y = self.apply_axis_correction(grid_x, grid_y)
+        
+        # Center coordinates: (0,0) of map = top-left, (16,16) = center
+        centered_x = corrected_x - 16.0
+        centered_y = corrected_y - 16.0
+        
+        # Simple isometric conversion (same for all entities)
+        iso_x, iso_y = grid_to_iso(centered_x, centered_y, TILE_WIDTH, TILE_HEIGHT)
+        
+        # Apply screen centering and camera offset
+        screen_x = iso_x + self.screen_center_x + camera_offset[0]
+        screen_y = iso_y + self.screen_center_y + camera_offset[1]
+        
+        return (screen_x, screen_y)
+    
+    def apply_axis_correction(self, grid_x, grid_y):
+        """Apply unified axis correction for all entities
+        
+        Transforms grid coordinates to match visual movement:
+        - Input UP should decrease both visual X and Y (toward NW+NE)
+        - Input DOWN should increase both visual X and Y (toward SE+SW)
+        - Input LEFT should decrease visual X and increase visual Y (toward NW+SW)  
+        - Input RIGHT should increase visual X and decrease visual Y (toward SE+NE)
+        """
+        # This transformation makes movement visually consistent
+        # The same correction that was in Character's handle_input
+        corrected_x = float(grid_x)
+        corrected_y = float(grid_y)
+        
+        return corrected_x, corrected_y
+    
+    def reverse_axis_correction(self, corrected_x, corrected_y):
+        """Reverse axis correction for position storage"""
+        # Currently identity, but allows future modifications
+        grid_x = float(corrected_x)
+        grid_y = float(corrected_y)
+        
+        return grid_x, grid_y
+    
+    def register_entity(self, entity):
+        """Reliably register entity with world"""
+        if entity not in self.entities:
+            self.entities.append(entity)
+            entity.world = self  # Set world reference
+            
+            # Log registration with reliable position
+            grid_pos = entity.get_grid_position()
+            screen_pos = self.get_screen_position(grid_pos[0], grid_pos[1])
+            print(f"[WORLD] Registered {entity.name} at grid {grid_pos} -> screen {screen_pos}")
+    
+    def get_tile_image(self, tile_id):
+        """Get tile image by ID"""
+        if not self.tile_images:
+            return None
+            
+        # Use tile_id as index (with bounds checking)
+        idx = (tile_id - 1) % len(self.tile_images)
+        return self.tile_images[idx]
+    
+    def draw(self, screen, camera_offset=(0, 0)):
+        """Draw the isometric world with proper layer ordering"""
+        # Clear background
+        screen.fill((50, 80, 50))  # Dark green
+        
+        # Get visible tiles with layer support
+        visible_tiles = []
+        for tile_key, tile_data in self.tile_grid.items():
+            # Handle both (x,y) and (x,y,layer) keys
+            if len(tile_key) == 3:  # (x, y, layer)
+                grid_x, grid_y, layer = tile_key
+            elif len(tile_key) == 2:  # (x, y) - skip these, we want layered ones
+                continue
+            else:
+                continue
+                
+            screen_x, screen_y = self.get_screen_position(grid_x, grid_y, camera_offset)
+            
+            # Only draw tiles that might be visible
+            if (-TILE_WIDTH < screen_x < screen.get_width() + TILE_WIDTH and 
+                -TILE_HEIGHT < screen_y < screen.get_height() + TILE_HEIGHT):
+                
+                visible_tiles.append((grid_x, grid_y, layer, tile_data, screen_x, screen_y))
+        
+        # Sort for proper isometric rendering: layer first, then y, then x
+        visible_tiles.sort(key=lambda t: (t[2], t[1], t[0]))  # Sort by layer, y, x
+        
+        # Draw tiles with layer offset
+        for grid_x, grid_y, layer, tile_data, screen_x, screen_y in visible_tiles:
+            tile_img = self.get_tile_image(tile_data['tile_id'])
+            if tile_img:
+                # Apply Z offset: each layer is 16px higher
+                z_offset = layer * 16
+                draw_x = screen_x - TILE_WIDTH//2
+                draw_y = screen_y - TILE_HEIGHT//2 - z_offset
+                screen.blit(tile_img, (draw_x, draw_y))
+            
+            # Debug: draw layer info
+            if False:  # Enable for debugging
+                font = pygame.font.Font(None, 16)
+                text = font.render(f"L{layer}", True, (255, 255, 255))
+                screen.blit(text, (screen_x - 10, screen_y - 10))
+    
+    def draw_debug_grid(self, screen, camera_offset=(0, 0)):
+        """Draw debug grid overlay"""
+        for x in range(-5, 6):
+            for y in range(-5, 6):
+                screen_x, screen_y = self.get_screen_position(x, y, camera_offset)
+                
+                # Draw diamond outline
+                points = [
+                    (screen_x, screen_y - TILE_HEIGHT//4),
+                    (screen_x + TILE_WIDTH//4, screen_y),
+                    (screen_x, screen_y + TILE_HEIGHT//4),
+                    (screen_x - TILE_WIDTH//4, screen_y)
+                ]
+                pygame.draw.polygon(screen, (255, 255, 255), points, 1)
+                
+                # Draw coordinates
+                font = pygame.font.Font(None, 16)
+                text = font.render(f"{x},{y}", True, (255, 255, 255))
+                text_rect = text.get_rect(center=(screen_x, screen_y))
+                screen.blit(text, text_rect)
+    
+    def print_entity_positions(self):
+        """Debug: Print reliable positions of all entities"""
+        print("[WORLD] === ENTITY POSITIONS ===")
+        for entity in self.entities:
+            grid_pos = entity.get_grid_position()
+            float_pos = entity.get_position()
+            screen_pos = self.get_screen_position(float_pos[0], float_pos[1])
+            
+            # Check if position is on a tile
+            is_on_tile = grid_pos in self.tile_grid
+            is_walkable = self.is_valid_position(grid_pos[0], grid_pos[1]) if is_on_tile else False
+            
+            position_info = f"  {entity.name}: grid {grid_pos}"
+            if hasattr(entity, 'float_pos'):
+                position_info += f", float {tuple(entity.float_pos)}"
+            position_info += f" -> screen {screen_pos}"
+            position_info += f" [tile: {is_on_tile}, walkable: {is_walkable}]"
+            
+            print(position_info)
+        print("[WORLD] ========================")
+    
+    def debug_spawn_points(self):
+        """Debug spawn points with REAL coordinates"""
+        print("[WORLD] === SPAWN POINTS DEBUG (REAL COORDS) ===")
+        for name, (x, y) in self.spawn_points.items():
+            is_valid = self.is_valid_position(x, y)
+            is_walkable = self.walkable_grid.get((x, y), False)
+            tile_in_layer1 = (x, y, self.walkable_layer_index) in self.tile_grid
+            
+            print(f"  {name}: real({x}, {y}) -> valid: {is_valid}, walkable: {is_walkable}, layer1: {tile_in_layer1}")
+        print("[WORLD] =================================")

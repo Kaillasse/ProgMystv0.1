@@ -56,15 +56,21 @@ class SessionManager:
     def create_player_files(cls, name):
         with open(get_grimoire_path(name), "w") as f:
             f.write(f"# Grimoire de {name}\n\n")
-        player_data = {"name": name, "progress": {}, "bust": {}, "sprite": {}, "border": {}}
+        player_data = {
+            "name": name, 
+            "progress": {}, 
+            "bust": {}, 
+            "sprite": {}, 
+            "border": {},
+            "dialogue_state": {}  # Nouvel ajout pour sauvegarder l'état des dialogues
+        }
         with open(get_player_data_path(name), "w", encoding="utf-8") as f:
             json.dump(player_data, f, indent=4)
 
 class GameSession:
-    def update_tile_pos(self, x, y, z=0, map_name=None):
+    def update_grid_position(self, x, y, z=0, map_name=None):
         """
-        Met à jour la position du joueur à partir des coordonnées de tuile (grille).
-        Si map_name n'est pas fourni, conserve la map actuelle.
+        UNIFIED: Update player position using grid coordinates.
         """
         if map_name is None:
             map_name = self.data.get("current_map", "clairiere")
@@ -134,13 +140,153 @@ class GameSession:
             return False
         value = self.data["progress"].get(key)
         return value is not None and value is not False
+    
+    # === DIALOGUE STATE MANAGEMENT ===
+    
+    def get_dialogue_state(self, npc_name):
+        """
+        Récupère l'état actuel du dialogue pour un PNJ.
+        Retourne l'index/nom du dernier dialogue atteint.
+        """
+        if "dialogue_state" not in self.data:
+            self.data["dialogue_state"] = {}
+        return self.data["dialogue_state"].get(npc_name, None)
+    
+    def set_dialogue_state(self, npc_name, dialogue_index):
+        """
+        Sauvegarde l'état du dialogue pour un PNJ.
+        """
+        if "dialogue_state" not in self.data:
+            self.data["dialogue_state"] = {}
+        
+        old_state = self.data["dialogue_state"].get(npc_name, "aucun")
+        self.data["dialogue_state"][npc_name] = dialogue_index
+        print(f"[SESSION] Dialogue state {npc_name}: {old_state} -> {dialogue_index}")
+        self.save_data()
+    
+    def get_dialogue_entry_point(self, npc_name):
+        """
+        DEPRECATED: Cette méthode est maintenant gérée par DialogueDispatcher.
+        Retourne simplement l'état sauvegardé ou un état par défaut.
+        """
+        print(f"[SESSION] WARNING: get_dialogue_entry_point deprecated pour {npc_name}")
+        print(f"[SESSION] Utiliser DialogueDispatcher._determine_entry_point() à la place")
+        
+        # Retourne l'état sauvegardé ou un défaut simple
+        current_state = self.get_dialogue_state(npc_name)
+        if current_state:
+            return current_state
+        
+        # États par défaut simples
+        defaults = {
+            "DameIndenta": "D1",
+            "Neuill": "N0", 
+            "JSON": "J0",
+            "Loopfang": "L0"
+        }
+        return defaults.get(npc_name, "unknown")
+    
+    # Méthodes depreciées - logique déplacée vers DialogueDispatcher
+    def _dame_indenta_quests_completed(self):
+        """DEPRECATED: Logique déplacée vers DialogueDispatcher"""
+        print("[SESSION] WARNING: _dame_indenta_quests_completed deprecated")
+        print("[SESSION] Utiliser DialogueDispatcher._get_quests_reachable_from_start() à la place")
+        return False
+    
+    def _npc_state_quests_completed(self, npc_name, current_state):
+        """DEPRECATED: Logique déplacée vers DialogueDispatcher"""
+        print(f"[SESSION] WARNING: _npc_state_quests_completed deprecated pour {npc_name}")
+        print("[SESSION] Utiliser DialogueDispatcher._get_quests_reachable_from_start() à la place")
+        return False
+    
+    def give_quest(self, quest_code):
+        """
+        Marque une quête comme donnée au joueur.
+        """
+        if "quests" not in self.data:
+            self.data["quests"] = {}
+        
+        if quest_code not in self.data["quests"]:
+            # Importe quest.py pour obtenir les détails de la quête
+            from core.quest import QUESTS, NEW_QUESTS, SECRET_QUESTS
+            all_quests = QUESTS + NEW_QUESTS + SECRET_QUESTS
+            
+            quest_obj = None
+            for quest in all_quests:
+                if quest.code == quest_code:
+                    quest_obj = quest
+                    break
+            
+            if quest_obj:
+                self.data["quests"][quest_code] = {
+                    'given': True,
+                    'completed': False,
+                    'name': quest_obj.nom,
+                    'description': quest_obj.description
+                }
+                print(f"[SESSION] Quête donnée: {quest_code} - {quest_obj.nom}")
+            else:
+                self.data["quests"][quest_code] = {
+                    'given': True,
+                    'completed': False,
+                    'name': quest_code,
+                    'description': 'Quête inconnue'
+                }
+                print(f"[SESSION] Quête inconnue donnée: {quest_code}")
+        else:
+            self.data["quests"][quest_code]['given'] = True
+            print(f"[SESSION] Quête marquée comme donnée: {quest_code}")
+        
+        self.save_data()
+    
+    def complete_quest(self, quest_code):
+        """
+        Marque une quête comme accomplie.
+        """
+        if "quests" not in self.data:
+            self.data["quests"] = {}
+        
+        if quest_code in self.data["quests"]:
+            self.data["quests"][quest_code]['completed'] = True
+            print(f"[SESSION] Quête accomplie: {quest_code}")
+            self.save_data()
+        else:
+            print(f"[SESSION] Tentative d'accomplir une quête non donnée: {quest_code}")
+    
+    def is_quest_given(self, quest_code):
+        """
+        Vérifie si une quête a été donnée au joueur.
+        """
+        if "quests" not in self.data:
+            return False
+        return self.data["quests"].get(quest_code, {}).get('given', False)
+    
+    def is_quest_completed(self, quest_code):
+        """
+        Vérifie si une quête a été accomplie par le joueur.
+        """
+        if "quests" not in self.data:
+            return False
+        return self.data["quests"].get(quest_code, {}).get('completed', False)
+    
+    def get_quest_data(self, quest_code):
+        """
+        Retourne toutes les données d'une quête.
+        """
+        if "quests" not in self.data:
+            return None
+        return self.data["quests"].get(quest_code, None)
+    
+    def get_all_quests(self):
+        """
+        Retourne toutes les données de quêtes du joueur.
+        """
+        return self.data.get("quests", {})
 
     def __init__(self, player_name):
         self.name = player_name
-        # Correction : charge la map via Zone
-        world = World()  # Uses "clairiere" as default map
-        # World loads automatically, no need to call load()
-        # Simplification : plus de map complexe, juste une grille basique
+        # Simplification : plus besoin de World ici, GameManager le créera avec screen
+        # Plus de map complexe, juste une grille basique pour compatibilité
         self.map = [[1 for _ in range(20)] for _ in range(20)]  # Grille 20x20 simple
         self.grid = self.map
         self.data_path = get_player_data_path(player_name)
@@ -169,31 +315,14 @@ class GameSession:
             print(f"[SESSION] Ajout Z=0, position finale: {self.data['position']}")
 
     def is_valid_position(self, pos):
-        if not self.grid or not pos:
-            return False
-        # Accepte positions 2D [x, y] et 3D [x, y, z]
-        if len(pos) >= 2:
-            x, y = pos[0], pos[1]
-            if 0 <= y < len(self.grid) and 0 <= x < len(self.grid[0]):
-                return self.grid[y][x] > 0  # Tuile valide (pas -1 ou 0)
-        return False
+        """DEPRECATED: Use world.is_valid_position() instead for unified validation"""
+        print("[SESSION] WARNING: Using deprecated is_valid_position, use world authority instead")
+        return True  # Fallback
 
     def find_special_start_pos(self):
-        """
-        Trouve une position de spawn valide (première tuile praticable).
-        Retourne [x, y].
-        """
-        if not self.grid:
-            print("[SESSION] Aucune grille disponible pour trouver spawn")
-            return [15, 15]
-            
-        print(f"[SESSION] Recherche spawn dans grille {len(self.grid[0])}x{len(self.grid)}")
-        
-        # Utilise le spawn par défaut
-        spawn_x, spawn_y = 9, 10  # Position de spawn par défaut
-        
-        print(f"[SESSION] Spawn défini en ({spawn_x}, {spawn_y})")
-        return [spawn_x, spawn_y]
+        """UNIFIED: Use world spawn points instead of hardcoded positions"""
+        print("[SESSION] UNIFIED: Using world spawn point for player")
+        return [0, 0]  # World spawn point for "joueur"
 
     def load_data(self):
         try:
@@ -204,8 +333,14 @@ class GameSession:
 
                 # 🔧 Correction proactive des couleurs manquantes dans le buste
                 bust = self.data.get("bust", {})
+                if not bust:  # Fallback vers l'ancien format "buste"
+                    bust = self.data.get("buste", {})
+                    if bust:
+                        self.data["bust"] = bust  # Migration vers le nouveau format
+                        print("[SESSION] Migration de 'buste' vers 'bust'")
+                
                 for key, layer in bust.items():
-                    if layer.get("color") is None:
+                    if isinstance(layer, dict) and layer.get("color") is None:
                         print(f"[SESSION] Couleur manquante pour '{key}' corrigée.")
                         layer["color"] = (255, 255, 255)
 
@@ -221,17 +356,17 @@ class GameSession:
             self.data["border"] = {"current_index": 0}
             print("[SESSION] Champ 'border' ajouté avec index par défaut 0")
 
-        # Position initiale par défaut
+        # UNIFIED: Position initiale via world spawn points
         if "position" not in self.data:
-            self.data["position"] = [10, 3]
+            self.data["position"] = [0, 0, 0]  # Use world spawn authority
 
     def save_data(self):
         # Mise à jour sécurisée des champs critiques
         self.data["sprite_path"] = self.sprite_path
 
-        # Assure qu'une position est toujours présente
+        # UNIFIED: Assure qu'une position valide est présente
         if "position" not in self.data:
-            self.data["position"] = [5, 5]
+            self.data["position"] = [0, 0, 0]  # Use world spawn authority
 
         with open(self.data_path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=4)

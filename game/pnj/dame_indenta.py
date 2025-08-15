@@ -3,11 +3,14 @@ from game.entity import Entity
 
 
 class DameIndenta(Entity):
-    def __init__(self, tile_pos, name="Dame Indenta", sprite_path="assets/pnj/di/di_sprite.png",
-                 bust_path="assets/pnj/di/di_bust.png", combat_start_tile=(2, 2)):
+    def __init__(self, grid_pos, name="Dame Indenta", sprite_path="assets/pnj/di/di_sprite.png",
+                 bust_path="assets/pnj/di/di_bust.png"):
         
-        # Initialisation de la classe Entity
-        super().__init__(tile_pos, name)
+        # UNIFIED: Initialize with grid coordinates
+        super().__init__(grid_pos, name)
+        
+        # UNIFIED: Set movement type for NPCs (tile-based with smooth animations)
+        self.movement_type = "tile_based"
         
         # Attributs spécifiques à Dame Indenta
         self.sprite_path = sprite_path
@@ -71,6 +74,14 @@ class DameIndenta(Entity):
             "walk_frontright": [15, 17], "walk_frontleft": [3, 5], "walk_backright": [39, 41], "walk_backleft": [27, 29]
         }
     
+    def update(self, dt):
+        """UNIFIED: Update NPC with movement and animation"""
+        # Update movement animation (from Entity base class)
+        self.update_movement(dt)
+        
+        # Update sprite animation
+        self.update_animation(dt)
+    
     def update_animation(self, dt):
         """Met à jour l'animation du PNJ"""
         self.frame_timer += dt
@@ -78,7 +89,11 @@ class DameIndenta(Entity):
             self.frame_timer = 0
             animation_frames = self.animations.get(self.current_animation, [0])
             self.frame_index = (self.frame_index + 1) % len(animation_frames)
-    
+
+    def update_movement(self, dt):
+        """Met à jour le mouvement du PNJ"""
+        pass
+
     def get_current_frame(self):
         """Retourne la frame actuelle à afficher"""
         if not self.frames:
@@ -98,31 +113,22 @@ class DameIndenta(Entity):
             print(f"[DEBUG] Progression chargée pour {self.name}: quêtes données = {self.has_given_quests}")
 
     def speak(self):
+        """UNIFIED: Default speak method when no session available"""
         if not self.has_given_quests:
             messages = [
                 "Salutations, apprenti !",
-                "Je suis Neuill, spécialiste des chaînes de caractères et des boucles.",
-                "Tu as déjà parlé à Dame Indenta ? Parfait !",
-                "Voici tes prochaines quêtes pour progresser :\n" + \
-                "6. Utilise len() pour connaître la longueur d'une chaîne\n" + \
-                "7. Accède au premier caractère d'une chaîne avec [0]\n" + \
-                "8. Utilise le slicing [début:fin] pour extraire une portion\n" + \
-                "9. Utilise une méthode de chaîne (.upper(), .lower(), .replace(), etc.)\n" + \
-                "10. Utilise une boucle for avec range() pour répéter des actions"
+                "Je suis Dame Indenta, gardienne de l'indentation et de la syntaxe.",
+                "Pour progresser, tu auras besoin d'accéder à ton grimoire personnel.",
+                "Assure-toi d'être connecté avec ta session pour recevoir tes quêtes !"
             ]
             print(f"[DIALOG] {self.name} dit: {messages[self.dialog_state]}")
             self.dialog_state = (self.dialog_state + 1) % len(messages)
             if self.dialog_state == 0:
                 self.has_given_quests = True
         else:
-            print(f"[DIALOG] {self.name} dit: Je ne peux pas vérifier tes quêtes sans accéder à ta session...")
-            print(f"[DIALOG] {self.name} dit: Assure-toi d'être connecté correctement !")
+            print(f"[DIALOG] {self.name} dit: Connecte-toi avec ta session pour vérifier tes progrès !")
+            print(f"[DIALOG] {self.name} dit: Ou alors... nous pouvons nous battre ! 😈")
 
-    def move(self, dx, dy):
-        """Déplace Dame Indenta sur la grille de combat"""
-        self.combat_tile_x += dx
-        self.combat_tile_y += dy
-        return True
     
     def attack(self, target):
         """Dame Indenta attaque une cible"""
@@ -132,6 +138,38 @@ class DameIndenta(Entity):
             print(f"[COMBAT] Dame Indenta attaque {target.name if hasattr(target, 'name') else 'cible'} pour {damage} dégâts!")
             return True
         return False
+    
+    def interact(self, session=None):
+        """UNIFIED: Interaction when player clicks on Dame Indenta"""
+        if session:
+            self.interact_with_session(session)
+        else:
+            self.speak()
+            
+    def interact_with_session(self, session):
+        """UNIFIED: Interaction with access to player session"""
+        self.load_progress_from_session(session)
+        
+        if not self.has_given_quests:
+            messages = [
+                "Salutations, apprenti !",
+                "Je suis Dame Indenta, gardienne de l'indentation et de la syntaxe.",
+                "Prêt à apprendre les bases de Python ? Voici tes premières quêtes :",
+                "1. Utilise print() pour afficher un message\n" + \
+                "2. Utilise input() pour demander une information\n" + \
+                "3. Crée une variable avec un nom significatif\n" + \
+                "4. Utilise une condition if pour faire un choix\n" + \
+                "5. Utilise une condition else pour gérer l'alternative"
+            ]
+            print(f"[DIALOG] {self.name} dit: {messages[self.dialog_state]}")
+            self.dialog_state = (self.dialog_state + 1) % len(messages)
+            if self.dialog_state == 0:
+                self.has_given_quests = True
+                session.set_progress("pnj_dame_indenta_quests_given", True)
+                session.save_data()
+        else:
+            print(f"[DIALOG] {self.name} dit: Tu as déjà reçu mes quêtes. Va pratiquer dans ton grimoire !")
+            print(f"[DIALOG] {self.name} dit: Si tu veux te battre, nous pouvons engager le combat !")
     
 # Exemple d'arbre de dialogue pour Dame Indenta (à placer à la fin de la classe DameIndenta)
 # Chaque clé est un noeud, chaque valeur contient le texte et 3 réponses possibles

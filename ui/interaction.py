@@ -3,11 +3,8 @@ import pygame
 from ui.uitools import BorderManager
 from core.settings import FONTS
 
-# Import des arbres de dialogue
-from game.pnj.dame_indenta import dame_indenta_dialogue_tree
-from game.pnj.neuill import neuill_dialogue_tree
-from game.pnj.json import json_dialogue_tree
-from game.pnj.loopfang import loopfang_dialogue_tree
+# Import du dispatcher de dialogue
+from core.dialogue_dispatcher import DialogueDispatcher
 
 class DialogueButton:
     """Classe pour les boutons de réponse dans les dialogues"""
@@ -51,8 +48,8 @@ class InteractionUI:
         self.screen_height = screen_height
         self.is_active = False
         
-        # Gestionnaire de bordures
-        self.border_manager = BorderManager(session=session)
+        # Gestionnaire de bordures (utilise l'instance singleton)
+        self.border_manager = BorderManager.get_instance(session)
         
         # Images de bustes
         self.character_bust = None
@@ -81,6 +78,9 @@ class InteractionUI:
         self.dialogue_tree = None
         self.current_node = "start"
         
+        # Dispatcher de dialogue depuis .twee
+        self.dialogue_dispatcher = DialogueDispatcher()
+        
         # Callback pour déclencher des actions spéciales (comme le combat)
         self.action_callback = None
 
@@ -106,43 +106,8 @@ class InteractionUI:
         print(f"[INTERACTION] Dialogue démarré avec {npc.name}")
 
     def _build_dialogue_tree(self, npc, session):
-        """Construit l'arbre de dialogue pour le PNJ donné"""
-        if npc.name == "DameIndenta":
-            return dame_indenta_dialogue_tree
-        elif npc.name == "Neuill":
-            return neuill_dialogue_tree
-        elif npc.name == "JSON":
-            return json_dialogue_tree
-        elif npc.name == "Loopfang":
-            return loopfang_dialogue_tree
-        else:
-            # Arbre de dialogue générique pour PNJ inconnus
-            return {
-                "start": {
-                    "text": f"{npc.name} vous salue. Que voulez-vous faire ?",
-                    "responses": [
-                        {"label": "Discuter", "next": "talk"},
-                        {"label": "Demander un conseil", "next": "advice"},
-                        {"label": "Au revoir", "action": "end"}
-                    ]
-                },
-                "talk": {
-                    "text": f"{npc.name} : Il fait beau aujourd'hui !",
-                    "responses": [
-                        {"label": "Retour", "next": "start"},
-                        {"label": "Merci", "action": "end"},
-                        {"label": "Au revoir", "action": "end"}
-                    ]
-                },
-                "advice": {
-                    "text": "Continue à explorer et à apprendre !",
-                    "responses": [
-                        {"label": "Retour", "next": "start"},
-                        {"label": "Merci", "action": "end"},
-                        {"label": "Au revoir", "action": "end"}
-                    ]
-                }
-            }
+        """Construit l'arbre de dialogue pour le PNJ donné en utilisant le dispatcher"""
+        return self.dialogue_dispatcher.get_dialogue_tree_for_npc(npc.name, session)
 
     def _set_dialogue_from_node(self):
         """Met à jour le texte et les boutons selon le nœud courant de l'arbre de dialogue"""
@@ -184,7 +149,8 @@ class InteractionUI:
             surf = pygame.Surface((150, 200))
             surf.fill(fallback_color)
             return surf
-        self.character_bust = load_bust("data/thib_bust.png", (255, 100, 100))
+        bust_path = f"data/{character.name.lower()}_bust.png"
+        self.character_bust = load_bust(bust_path, (255, 100, 100))
         bust_path = getattr(npc, 'bust_path', None)
         self.npc_bust = load_bust(bust_path, (100, 100, 255))
             
@@ -243,6 +209,16 @@ class InteractionUI:
                     self.action_callback("start_combat_dame_indenta")
                 self.end_interaction()
                 return "start_combat"
+            elif resp["action"] == "quest_info":
+                # Affiche les informations d'une quête
+                quest_code = resp.get("quest_info")
+                if quest_code:
+                    self._show_quest_info(quest_code)
+                return "continue"
+            elif resp["action"] == "back_to_dialogue":
+                # Retour au dialogue principal depuis l'info quête
+                self._set_dialogue_from_node()
+                return "continue"
             # Ajouter d'autres actions ici si besoin
         elif "next" in resp:
             # Naviguer vers un autre nœud de l'arbre
@@ -250,6 +226,35 @@ class InteractionUI:
             self._set_dialogue_from_node()
             return "continue"
         return None
+    
+    def _show_quest_info(self, quest_code):
+        """Affiche les informations détaillées d'une quête"""
+        from core.quest import QUESTS, NEW_QUESTS, SECRET_QUESTS
+        
+        # Trouve la quête correspondante
+        quest_obj = None
+        for quest in QUESTS + NEW_QUESTS + SECRET_QUESTS:
+            if quest.code == quest_code:
+                quest_obj = quest
+                break
+        
+        if quest_obj:
+            # Crée un dialogue temporaire avec les informations de la quête
+            info_text = f"Quête: {quest_obj.nom}\n\nDescription: {quest_obj.description}"
+            self.current_dialogue = info_text
+            
+            # Bouton de retour
+            self.response_buttons = []
+            dialogue_rect = pygame.Rect(40, self.screen_height - 250, self.screen_width - 80, 200)
+            button_rect = pygame.Rect(dialogue_rect.centerx - 50, self.screen_height - 53, 100, 30)
+            
+            back_response = {"label": "Retour", "action": "back_to_dialogue"}
+            button = DialogueButton("Retour", back_response, button_rect)
+            self.response_buttons.append(button)
+            
+            print(f"[INTERACTION] Affichage info quête: {quest_code} - {quest_obj.nom}")
+        else:
+            print(f"[INTERACTION] Quête introuvable: {quest_code}")
         
     def render(self, screen):
         """

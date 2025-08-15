@@ -39,7 +39,7 @@ class MainMenu:
         self.char_pos = (char_x, char_y)
         self.avatar_rect = pygame.Rect(self.char_pos[0], self.char_pos[1], 48 * self.sprite_scale, 96 * self.sprite_scale)
         self.play_rect = pygame.Rect((screen_w - 150) // 2, 400, 150, 50)
-        self.border_mgr = BorderManager(session=session)
+        self.border_mgr = BorderManager.get_instance(session)
 
         # Animation idle/rotation: charge plusieurs frames si disponibles
         self.idle_frames = self.load_idle_frames(self.sprite_path)
@@ -229,7 +229,7 @@ def ask_player_name(screen):
     done = False
     
     # Initialisation des éléments d'interface avec uitools
-    border_mgr = BorderManager()  # Pas de session lors de la saisie du nom
+    border_mgr = BorderManager.get_instance()  # Pas de session lors de la saisie du nom
     star_frames = load_star_frames(get_star_sprite_path())
     stars = create_starry_background(star_frames, screen.get_width(), screen.get_height(), 50)
     bg_image = load_background_image("assets/other/blueaura.png", (screen.get_width(), screen.get_height()))

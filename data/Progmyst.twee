@@ -1,0 +1,506 @@
+:: StoryTitle
+Progmyst
+
+
+:: StoryData
+{
+  "ifid": "42F6D0F0-EA78-47A0-A7C9-1C07D477192E",
+  "format": "Harlowe",
+  "format-version": "3.3.9",
+  "start": "D1",
+  "tag-colors": {
+    "DameIndenta": "red",
+    "Neuill": "green",
+    "JSON": "yellow",
+    "Loopfang": "blue"
+  },
+  "zoom": 1
+}
+
+
+:: COMBAT {"position":"2000,450","size":"100,100"}
+
+
+
+:: D1 [DameIndenta] {"position":"500,25","size":"200,200"}
+print("Bonjour, apprenti !")
+[[rD1]]
+[[rD2]]
+
+
+:: D1' [DameIndenta] {"position":"725,25","size":"200,200"}
+[[rD6]]
+[[rD5]]
+
+
+
+:: D2 [DameIndenta] {"position":"1350,25","size":"200,200"}
+[[rD8]]
+[[rD7]]
+
+
+
+:: D2' [DameIndenta] {"position":"1000,425","size":"200,200"}
+[[rD14]]
+[[rD15]]
+
+
+
+:: D3 [DameIndenta] {"position":"1900,200","size":"200,200"}
+[[rD16]]
+[[rD17]]
+[[COMBAT]] 
+
+
+:: J0 [JSON] {"position":"25,1850","size":"200,200"}
+[[rJ1]]
+[[rJ2]]
+
+
+:: J1 [JSON] {"position":"600,1800","size":"200,200"}
+[[rJ3]][[rJ4]]
+
+
+:: J2 [JSON] {"position":"1400,1825","size":"200,200"}
+
+
+
+:: L0 [Loopfang] {"position":"25,1350","size":"200,200"}
+[[rL1]]
+[[rL2]]
+
+
+:: L1 [Loopfang] {"position":"550,1175","size":"200,200"}
+[[rL3]][[rL4]]
+
+
+:: L2 [Loopfang] {"position":"1300,1200","size":"200,200"}
+
+
+
+:: N0 [Neuill] {"position":"25,850","size":"200,200"}
+[[rN1]]
+[[rN2]]
+
+
+:: N1 [Neuill] {"position":"600,850","size":"200,200"}
+[[rN3]][[rN4]]
+
+
+
+:: N2 [Neuill] {"position":"1375,850","size":"200,200"}
+
+
+
+:: Q1 [DameIndenta] {"position":"500,425","size":"100,200"}
+[[rD3]]
+[[rD4]]
+
+
+:: Q10 [Neuill] {"position":"1650,875","size":"100,200"}
+
+
+
+:: Q11 [DameIndenta] {"position":"2275,25","size":"100,200"}
+'Commentaires',
+Ajouter au moins 3 commentaires pertinents dans le code
+[[rD17]] 
+[[rD18]]
+
+
+:: Q12 [DameIndenta] {"position":"2675,150","size":"100,200"}
+[[rD19]][[rD17]]
+
+
+
+:: Q13 [Neuill] {"position":"1800,875","size":"100,200"}
+
+
+
+:: Q14 [Loopfang] {"position":"1550,1225","size":"100,200"}
+
+
+
+:: Q15 [Loopfang] {"position":"1725,1225","size":"100,200"}
+
+
+
+:: Q16 [Neuill] {"position":"1925,875","size":"100,200"}
+
+
+
+:: Q17 [JSON] {"position":"1700,1900","size":"100,200"}
+
+
+
+:: Q18 [JSON] {"position":"1850,1900","size":"100,200"}
+
+
+
+:: Q19 [Loopfang] {"position":"2100,1250","size":"100,200"}
+
+
+
+:: Q2 [DameIndenta] {"position":"1600,300","size":"100,200"}
+[[echD1]]
+[[rD12]]
+
+
+
+:: Q20 [Neuill] {"position":"2200,850","size":"100,200"}
+
+
+
+:: Q21 [Neuill] {"position":"2400,850","size":"100,200"}
+
+
+
+:: Q22 [Loopfang] {"position":"2300,1250","size":"100,200"}
+
+
+
+:: Q23 [DameIndenta] {"position":"3600,25","size":"100,200"}
+
+
+
+:: Q24 [JSON] {"position":"2225,1975","size":"100,200"}
+
+
+
+:: Q25 [Loopfang] {"position":"2175,1350","size":"100,200"}
+
+
+
+:: Q26 [Neuill] {"position":"2500,850","size":"100,200"}
+
+
+
+:: Q27 [DameIndenta] {"position":"3750,25","size":"100,200"}
+
+
+
+:: Q28 [JSON] {"position":"2350,1975","size":"100,200"}
+
+
+
+:: Q29 [Neuill] {"position":"2700,850","size":"100,200"}
+
+
+
+:: Q3 [DameIndenta] {"position":"1625,600","size":"100,200"}
+[[rD13]]
+[[echD1]] 
+
+
+:: Q30 [Loopfang] {"position":"2375,1350","size":"100,200"}
+
+
+
+:: Q4 [Neuill] {"position":"1075,800","size":"100,200"}
+[[rN4]] 
+
+
+:: Q5 [JSON] {"position":"800,2100","size":"100,200"}
+[[rqJ1]][[rJ5]]
+
+
+
+:: Q6 [JSON] {"position":"950,1800","size":"100,200"}
+[[rqJ1]][[rJ5]]
+
+
+
+:: Q7 [JSON] {"position":"1200,1925","size":"100,200"}
+[[rqJ1]] [[rJ6]]
+
+
+:: Q8 [Loopfang] {"position":"775,1400","size":"100,200"}
+[[rL4]][[rL5]]
+
+
+:: Q9 [Loopfang] {"position":"1150,1425","size":"100,200"}
+
+
+
+:: RetourD1' [DameIndenta] {"position":"1175,150","size":"100,100"}
+[[D1']]
+
+
+:: RetourD2' {"position":"775,475","size":"100,100"}
+[[D2']] 
+
+
+:: RetourJ0 [JSON] {"position":"400,1900","size":"100,100"}
+[[J0]] 
+
+
+:: RetourL0 [Loopfang] {"position":"400,1400","size":"100,100"}
+[[L0]] 
+
+
+:: RetourN0 [Neuill] {"position":"400,900","size":"100,100"}
+[[N0]] 
+
+
+:: RetourQ1 [DameIndenta] {"position":"175,425","size":"100,100"}
+[[Q1]]
+
+
+:: echD1 [DameIndenta] {"position":"1500,525","size":"100,100"}
+[[Q3]]
+[[Q2]] 
+
+
+:: iD10 [DameIndenta] {"position":"750,650","size":"200,100"}
+[[RetourD2']] 
+[[rD15]] 
+
+
+:: iD11 [DameIndenta] {"position":"2200,450","size":"200,100"}
+[[rD16]][[rD19]]
+
+
+:: iD12 [DameIndenta] {"position":"2575,375","size":"200,100"}
+[[rD16]] [[rD18]] 
+
+
+:: iD2 [DameIndenta] {"position":"50,275","size":"200,100"}
+[[rD4]]
+[[RetourQ1]] 
+
+
+
+
+:: iD3 [DameIndenta] {"position":"125,575","size":"200,100"}
+[[rD3]]
+[[RetourQ1]]
+
+
+
+:: iD4 [DameIndenta] {"position":"1125,25","size":"200,100"}
+[[RetourD1']]
+[[rD5]] 
+
+
+:: iD5 [DameIndenta] {"position":"1125,275","size":"200,100"}
+[[RetourD1']]
+[[rD6]] 
+
+
+:: iD6 [DameIndenta] {"position":"1900,600","size":"200,100"}
+[[rD9]]
+[[rD10]]
+
+
+:: iD7 {"position":"1250,400","size":"200,100"}
+[[echD1]]
+[[rD13]]
+
+
+:: iD8 [DameIndenta] {"position":"1250,650","size":"200,100"}
+[[echD1]] 
+[[rD12]] 
+
+
+:: iD9 [DameIndenta] {"position":"750,300","size":"200,100"}
+[[RetourD2']]
+[[rD14]] 
+
+
+:: iJ1 [JSON] {"position":"300,1725","size":"200,100"}
+[[rJ2]] [[RetourJ0]]
+
+
+
+:: iJ2 [JSON] {"position":"300,2075","size":"200,100"}
+[[rJ1]] [[RetourJ0]] 
+
+
+:: iJ3 [JSON] {"position":"925,2325","size":"200,100"}
+
+
+
+:: iL1 [Loopfang] {"position":"300,1225","size":"200,100"}
+[[RetourL0]]
+[[rL2]] 
+
+
+:: iL2 [Loopfang] {"position":"300,1575","size":"200,100"}
+[[rL1]] [[RetourL0]] 
+
+
+:: iL3 [Loopfang] {"position":"900,1275","size":"200,100"}
+[[rL5]][[rL6]]
+
+
+:: iL4 [Loopfang] {"position":"775,1625","size":"200,100"}
+[[rL3]] [[rL7]]
+
+
+:: iN1 [Neuill] {"position":"300,725","size":"200,100"}
+[[RetourN0]] 
+[[rN2]] 
+
+
+:: iN2 [Neuill] {"position":"300,1075","size":"200,100"}
+[[RetourN0]]
+[[rN1]] 
+
+
+:: iN3 [Neuill] {"position":"1000,1100","size":"200,100"}
+[[rN3]] 
+
+
+:: rD1 [DameIndenta] {"position":"450,275","size":"100,100"}
+heu boujour?
+[[Q1]] 
+
+
+
+:: rD10 [DameIndenta] {"position":"1775,650","size":"100,100"}
+[[Q3]]
+
+
+:: rD12 [DameIndenta] {"position":"1475,375","size":"100,100"}
+[[iD7]]
+
+
+:: rD13 [DameIndenta] {"position":"1500,700","size":"100,100"}
+[[iD8]]
+
+
+:: rD14 [DameIndenta] {"position":"975,650","size":"100,100"}
+[[iD10]]
+
+
+:: rD15 [DameIndenta] {"position":"975,300","size":"100,100"}
+[[iD9]]
+
+
+
+:: rD16 {"position":"2125,175","size":"100,100"}
+[[Q11]] 
+
+
+:: rD17 {"position":"2125,325","size":"100,100"}
+[[iD11]]
+
+
+
+:: rD18 {"position":"2425,125","size":"100,100"}
+[[Q12]] 
+
+
+:: rD19 {"position":"2425,400","size":"100,100"}
+[[iD12]]
+
+
+:: rD2 [DameIndenta] {"position":"575,275","size":"100,100"}
+¿print(?¿
+[[Q1]]
+
+
+
+:: rD3 [DameIndenta] {"position":"325,325","size":"100,100"}
+[[iD2]]
+
+
+:: rD4 [DameIndenta] {"position":"375,525","size":"100,100"}
+[[iD3]]
+
+
+:: rD5 [DameIndenta] {"position":"975,175","size":"100,100"}
+[[iD5]]
+
+
+:: rD6 [DameIndenta] {"position":"975,25","size":"100,100"}
+[[iD4]]
+
+
+:: rD7 [DameIndenta] {"position":"1600,175","size":"100,100"}
+[[iD6]]
+
+
+
+:: rD8 [DameIndenta] {"position":"1475,250","size":"100,100"}
+[[Q2]]
+
+
+
+:: rD9 [DameIndenta] {"position":"1775,475","size":"100,100"}
+[[Q2]] 
+
+
+:: rJ1 [JSON] {"position":"175,1725","size":"100,100"}
+[[iJ1]]
+
+
+:: rJ2 [JSON] {"position":"175,2075","size":"100,100"}
+[[iJ2]]
+
+
+:: rJ3 [JSON] {"position":"675,2025","size":"100,100"}
+[[Q5]] 
+
+
+:: rJ4 [JSON] {"position":"825,1850","size":"100,100"}
+[[Q6]] 
+
+
+:: rJ5 [JSON] {"position":"1075,1925","size":"100,100"}
+[[Q7]]
+
+
+
+:: rJ6 [JSON] {"position":"1100,2150","size":"200,100"}
+
+
+
+:: rL1 [Loopfang] {"position":"175,1225","size":"100,100"}
+[[iL1]]
+
+
+:: rL2 {"position":"175,1575","size":"100,100"}
+[[iL2]]
+
+
+:: rL3 [Loopfang] {"position":"650,1400","size":"100,100"}
+[[Q8]] 
+
+
+:: rL4 [Loopfang] {"position":"775,1275","size":"100,100"}
+[[iL3]]
+
+
+:: rL5 {"position":"900,1400","size":"100,100"}
+[[iL4]]
+
+
+:: rL6 [Loopfang] {"position":"1025,1425","size":"100,100"}
+[[iL4]] 
+
+
+:: rL7 [Loopfang] {"position":"1025,1550","size":"100,100"}
+[[Q9]] 
+
+
+:: rN1 [Neuill] {"position":"175,725","size":"100,100"}
+[[iN1]]
+
+
+
+:: rN2 [Neuill] {"position":"175,1075","size":"100,100"}
+[[iN2]]
+
+
+
+:: rN3 [Neuill] {"position":"850,800","size":"100,100"}
+[[Q4]]
+
+
+:: rN4 [Neuill] {"position":"825,1050","size":"100,100"}
+[[iN3]]
+
+
+:: rqJ1 [JSON] {"position":"925,2200","size":"100,100"}
+[[iJ3]]

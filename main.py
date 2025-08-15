@@ -5,7 +5,8 @@ import json
 
 from game.game_manager import GameManager
 from core.session import SessionManager
-from ui.main_menu import ask_player_name
+
+from ui import main_menu
 from ui.character_creator import CharacterCreator
 
 
@@ -17,7 +18,7 @@ def main():
     name = None
     session = None
     if not saves:
-        name = ask_player_name(screen)
+        name = main_menu.ask_player_name(screen)
         if name:
             SessionManager.create_player_files(name)
             session = SessionManager.get_session(name)

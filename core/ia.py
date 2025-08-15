@@ -8,8 +8,8 @@ class DameIndentaAI:
         self.name = name
         self.world_manager = world_manager
         self.speed = speed
-        self.combat_tile_x = 0
-        self.combat_tile_y = 4
+        # UNIFIED: Use grid_pos for positioning
+        self.grid_pos = [0, 4]
         self.current_hp = 2
         self.max_hp = 2
         self.current_frame = 0
@@ -58,36 +58,33 @@ class DameIndentaAI:
             
         player = player_units[0]  # Le joueur principal
         
-        # Si le joueur est sur la même ligne X ou Y, attaquer immédiatement
-        if dame_unit.tile_x == player.tile_x or dame_unit.tile_y == player.tile_y:
+        # UNIFIED: Check if player is on same line X or Y
+        if dame_unit.grid_pos[0] == player.grid_pos[0] or dame_unit.grid_pos[1] == player.grid_pos[1]:
             return ("attack", player)
         
-        # Sinon, se déplacer sur une ligne commune pour préparer l'attaque
-        # Choisir la ligne la plus proche
-        dx = abs(dame_unit.tile_x - player.tile_x)
-        dy = abs(dame_unit.tile_y - player.tile_y)
+        # UNIFIED: Move to common line to prepare attack
+        dx = abs(dame_unit.grid_pos[0] - player.grid_pos[0])
+        dy = abs(dame_unit.grid_pos[1] - player.grid_pos[1])
         
         if dx <= dy:
-            # Se déplacer sur la même ligne X que le joueur
-            return ("move", (player.tile_x, dame_unit.tile_y))
+            # Move to same X line as player
+            return ("move", (player.grid_pos[0], dame_unit.grid_pos[1]))
         else:
-            # Se déplacer sur la même ligne Y que le joueur
-            return ("move", (dame_unit.tile_x, player.tile_y))
+            # Move to same Y line as player
+            return ("move", (dame_unit.grid_pos[0], player.grid_pos[1]))
     
     def execute_action(self, dame_unit, action_type, target):
         """Exécute l'action choisie par l'IA"""
         if action_type == "move" and target:
             new_x, new_y = target
-            dame_unit.tile_x = new_x
-            dame_unit.tile_y = new_y
-            print(f"[IA] Dame Indenta se déplace vers ({new_x}, {new_y})")
+            dame_unit.move_to(new_x, new_y)
+            print(f"[IA] UNIFIED: Dame Indenta moves to ({new_x}, {new_y})")
             return True
             
         elif action_type == "attack" and target:
-            # Attaque one-shot
+            # One-shot attack
             target.current_hp = 0
-            target.is_alive = False
-            print(f"[IA] Dame Indenta attaque {target.name} - One Shot!")
+            print(f"[IA] UNIFIED: Dame Indenta attacks {target.name} - One Shot!")
             return True
             
         return False

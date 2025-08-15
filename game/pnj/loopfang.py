@@ -5,14 +5,16 @@ from core.analyze import analyser_script
 from game.entity import Entity
 
 class Loopfang(Entity):
-    def __init__(self, name="Loopfang", sprite_path="assets/pnj/loopfang/loopfang_sprite.png",
-                 bust_path="assets/pnj/loopfang/loopfang_bust.png",
-                 combat_start_tile=(4, 2), tile_pos=(1, 8)):
+    def __init__(self, grid_pos, name="Loopfang", sprite_path="assets/pnj/loopfang/loopfang_sprite.png",
+                 bust_path="assets/pnj/loopfang/loopfang_bust.png"):
 
-        super().__init__(tile_pos, name)
+        super().__init__(grid_pos, name)
+        
+        # UNIFIED: Set movement type for NPCs (tile-based with smooth animations)
+        self.movement_type = "tile_based"
+        
         self.sprite_path = sprite_path
         self.bust_path = bust_path
-        self.combat_start_tile = combat_start_tile
         self.quest_progress_key = "loopfang_progress"
         self.dialog_state = 0
         self.has_given_quests = False
@@ -67,6 +69,18 @@ class Loopfang(Entity):
             "idle": [191, 192, 193, 194]
         }
     
+    def update(self, dt):
+        """UNIFIED: Update NPC with movement and animation"""
+        # Update movement animation (from Entity base class)
+        self.update_movement(dt)
+        
+        # Update sprite animation
+        self.update_animation(dt)
+        
+    def update_movement(self, dt):
+        """Met à jour le mouvement du PNJ"""
+        pass
+
     def update_animation(self, dt):
         """Met à jour l'animation du PNJ"""
         self.frame_timer += dt
